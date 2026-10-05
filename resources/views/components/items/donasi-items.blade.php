@@ -7,6 +7,7 @@
         $target = (int) $prog->target_amount;
         $percent = (float) $prog->progress_percentage;
         $donorsCount = (int) $prog->donors_count;
+        $progSangha = $prog->sangha_members_list;
         $progPayload = [
             'id' => $prog->id,
             'title' => $prog->title,
@@ -21,6 +22,11 @@
             'daysLeft' => $prog->days_left_text,
             'status' => $isOpen ? 'open' : 'closed',
             'isOpen' => $isOpen,
+            'pembina' => $progSangha->map(fn($m) => [
+                'name' => $m->name,
+                'title' => $m->title ?: 'Bhikkhu Pembina',
+                'photo_url' => $m->photo_url,
+            ])->values()->all(),
         ];
     @endphp
     <article 
@@ -69,10 +75,10 @@
                 </div>
 
                 <!-- Floating Bhikkhu Sangha Endorsement Pill Bottom Left -->
-                @if($sanghaMembers->isNotEmpty())
+                @if($progSangha->isNotEmpty())
                     <div class="absolute bottom-3 left-3.5 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/65 backdrop-blur-md text-white border border-white/15 shadow-sm transition-transform hover:scale-105 duration-200">
                         <div class="flex -space-x-1.5 overflow-hidden">
-                            @foreach($sanghaMembers->take(3) as $member)
+                            @foreach($progSangha->take(3) as $member)
                                 <img 
                                     src="{{ $member->photo_url }}" 
                                     alt="{{ $member->name }}" 
@@ -82,7 +88,7 @@
                             @endforeach
                         </div>
                         <span class="text-[10px] font-bold text-amber-200 tracking-wide">
-                            {{ $sanghaMembers->count() > 1 ? 'Dewan Sangha' : 'Bhikkhu Pembina' }}
+                            {{ $progSangha->count() > 1 ? 'Dewan Sangha' : 'Bhikkhu Pembina' }}
                         </span>
                     </div>
                 @endif
@@ -140,7 +146,7 @@
             <div class="pt-3.5 border-t border-stone-200/70 dark:border-emerald-950/60 flex items-center gap-2">
                 @if ($isOpen)
                     <button 
-                        @click="openDanaModal('{{ addslashes($prog->title) }}', '{{ addslashes($prog->category) }}')"
+                        @click="openDanaModal('{{ addslashes($prog->title) }}', '{{ addslashes($prog->category) }}', @js($progPayload['pembina']))"
                         type="button" 
                         class="flex-1 inline-flex items-center justify-center gap-2 bg-[#0D5B3A] hover:bg-[#09472D] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-extrabold py-2.5 px-3.5 rounded-xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
                     >

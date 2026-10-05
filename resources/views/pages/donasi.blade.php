@@ -520,6 +520,29 @@ new class extends Component
                                     ></div>
                                 </div>
 
+                                <!-- Bhikkhu Pembina / Penanggung Jawab Program Card -->
+                                <template x-if="selectedProgramDetail.pembina && selectedProgramDetail.pembina.length > 0">
+                                    <div class="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/25 space-y-2">
+                                        <div class="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
+                                            <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300">
+                                                Bhikkhu Pembina / Penanggung Jawab
+                                            </span>
+                                            <span class="text-[10px] text-amber-900 dark:text-amber-300 font-extrabold" x-text="selectedProgramDetail.pembina.length > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina'"></span>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <template x-for="(m, i) in selectedProgramDetail.pembina" :key="i">
+                                                <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/70 dark:bg-emerald-950/40 border border-amber-500/15">
+                                                    <img :src="m.photo_url || '{{ asset('images/bhikkhu-sangha.jpg') }}'" :alt="m.name" class="w-9 h-9 rounded-full object-cover border border-amber-400 ring-1 ring-amber-300/30 shrink-0" />
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="text-xs font-black text-[#143D2D] dark:text-[#E8F3EE] truncate" x-text="m.name"></div>
+                                                        <div class="text-[10.5px] text-[#0D6E42] dark:text-emerald-400 font-bold truncate" x-text="m.title || 'Bhikkhu Pembina'"></div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+
                                 <!-- Box Transparansi & Anumodana -->
                                 <div class="p-4 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/20 flex items-start gap-3">
                                     <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -553,7 +576,7 @@ new class extends Component
                                     <!-- Button Salurkan Dana (If Open) -->
                                     <template x-if="selectedProgramDetail.isOpen">
                                         <button 
-                                            @click="programDetailModal = false; openDanaModal(selectedProgramDetail.title, selectedProgramDetail.category)"
+                                            @click="programDetailModal = false; openDanaModal(selectedProgramDetail.title, selectedProgramDetail.category, selectedProgramDetail.pembina)"
                                             type="button" 
                                             class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#0D5B3A] hover:bg-[#09472D] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-extrabold py-2.5 px-5 rounded-xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
                                         >
@@ -988,17 +1011,35 @@ new class extends Component
                         </div>
 
                         <!-- Mengetahui Dewan Bhikkhu Sangha Endorsement Card (Vertical Stack) -->
-                        @if($sanghaMembers->isNotEmpty())
-                            <div class="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/25 dark:border-amber-500/20 space-y-2.5 shadow-xs">
-                                <div class="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                                    <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300">
-                                        Mengetahui
-                                    </span>
-                                    <span class="text-[10.5px] text-amber-900 dark:text-amber-300 font-extrabold">
-                                        {{ $sanghaMembers->count() > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina' }}
-                                    </span>
-                                </div>
+                        <div x-show="(selectedProgramPembina && selectedProgramPembina.length > 0) || {{ $sanghaMembers->isNotEmpty() ? 'true' : 'false' }}" class="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/25 dark:border-amber-500/20 space-y-2.5 shadow-xs">
+                            <div class="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                                <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300">
+                                    Mengetahui
+                                </span>
+                                <span class="text-[10.5px] text-amber-900 dark:text-amber-300 font-extrabold" x-text="selectedProgramPembina && selectedProgramPembina.length > 0 ? (selectedProgramPembina.length > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina') : '{{ $sanghaMembers->count() > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina' }}'">
+                                    {{ $sanghaMembers->count() > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina' }}
+                                </span>
+                            </div>
 
+                            <template x-if="selectedProgramPembina && selectedProgramPembina.length > 0">
+                                <div class="space-y-2">
+                                    <template x-for="(member, idx) in selectedProgramPembina" :key="idx">
+                                        <div class="flex items-center gap-3 p-2 rounded-xl bg-white/70 dark:bg-emerald-950/40 border border-amber-500/15 dark:border-emerald-500/20 shadow-2xs">
+                                            <img 
+                                                :src="member.photo_url || '{{ asset('images/bhikkhu-sangha.jpg') }}'" 
+                                                :alt="member.name" 
+                                                class="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-amber-500/60 ring-2 ring-amber-400/25 shadow-sm shrink-0" 
+                                            />
+                                            <div class="space-y-0.5 min-w-0 flex-1">
+                                                <h4 class="text-xs sm:text-sm font-black text-[#143D2D] dark:text-[#E8F3EE] truncate" x-text="member.name"></h4>
+                                                <p class="text-[11px] text-[#0D6E42] dark:text-emerald-400 font-bold truncate" x-text="member.title || 'Bhikkhu Pembina Vihara'"></p>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template x-if="!selectedProgramPembina || selectedProgramPembina.length === 0">
                                 <div class="space-y-2">
                                     @foreach($sanghaMembers as $member)
                                         <div class="flex items-center gap-3 p-2 rounded-xl bg-white/70 dark:bg-emerald-950/40 border border-amber-500/15 dark:border-emerald-500/20 shadow-2xs">
@@ -1018,12 +1059,12 @@ new class extends Component
                                         </div>
                                     @endforeach
                                 </div>
+                            </template>
 
-                                <p class="text-[10.5px] text-stone-500 dark:text-stone-400 leading-tight px-0.5">
-                                    Penyaluran dāna kebajikan dinaungi & dibina oleh Bhikkhu Sangha Vihara Sāmaggi Gāma.
-                                </p>
-                            </div>
-                        @endif
+                            <p class="text-[10.5px] text-stone-500 dark:text-stone-400 leading-tight px-0.5">
+                                Penyaluran dāna kebajikan dinaungi & dibina oleh Bhikkhu Sangha Vihara Sāmaggi Gāma.
+                            </p>
+                        </div>
 
                     </div>
 
@@ -1071,6 +1112,7 @@ new class extends Component
                 selectedDonorCampaign: null,
                 selectedCertificate: null,
                 selectedProgramDetail: null,
+                selectedProgramPembina: null,
                 itemDonorSearch: '',
                 copiedCertRef: false,
                 isDownloadingImg: false,
@@ -1085,9 +1127,10 @@ new class extends Component
                     this.programDetailModal = true;
                 },
 
-                openDanaModal(title, category) {
+                openDanaModal(title, category, pembina = null) {
                     this.selectedCampaign = title;
                     this.selectedCategory = category;
+                    this.selectedProgramPembina = (pembina && pembina.length > 0) ? pembina : null;
                     this.paymentTab = 'bank';
                     this.danaModal = true;
                     this.copiedBankId = null;

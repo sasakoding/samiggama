@@ -18,6 +18,7 @@ class DonationProgram extends Model
         'end_date',
         'cover_image',
         'content',
+        'pembina',
         'status',
     ];
 
@@ -25,6 +26,7 @@ class DonationProgram extends Model
         'target_amount' => 'integer',
         'start_date' => 'date',
         'end_date' => 'date',
+        'pembina' => 'array',
     ];
 
     public function donations()
@@ -97,5 +99,31 @@ class DonationProgram extends Model
     public function scopeCompleted($query)
     {
         return $query->where('status', 'selesai');
+    }
+
+    public function getSanghaMembersListAttribute()
+    {
+        if (!empty($this->pembina) && is_array($this->pembina)) {
+            return collect($this->pembina)->map(fn($item) => (object) [
+                'name' => $item['name'] ?? '',
+                'title' => $item['title'] ?? 'Bhikkhu Pembina',
+                'photo_url' => !empty($item['photo'])
+                    ? (str_starts_with($item['photo'], 'http') ? $item['photo'] : asset($item['photo']))
+                    : asset('images/bhikkhu-sangha.jpg'),
+            ]);
+        }
+
+        $globalSangha = SanghaMember::active()->get();
+        if ($globalSangha->isNotEmpty()) {
+            return $globalSangha;
+        }
+
+        return collect([
+            (object) [
+                'name' => Setting::get('sangha_title', 'Bhikkhu Sangha Vihara Sāmaggi Gāma'),
+                'title' => 'Pembina Spiritual',
+                'photo_url' => asset(Setting::get('sangha_photo', 'images/bhikkhu-sangha.jpg')),
+            ]
+        ]);
     }
 }

@@ -23,6 +23,7 @@ new class extends Component
     public string $formStartDate = '';
     public string $formEndDate = '';
     public string $formContent = '';
+    public array $formPembina = [];
     public string $formStatus = 'aktif';
     public $formCoverImage = null;
     public ?string $existingCoverImage = null;
@@ -47,6 +48,7 @@ new class extends Component
         $this->formCategory = 'Pembangunan & Sarana';
         $this->formStatus = 'aktif';
         $this->formStartDate = date('Y-m-d');
+        $this->loadDefaultSangha();
         $this->modalOpen = true;
     }
 
@@ -64,11 +66,64 @@ new class extends Component
         $this->formStartDate = $program->start_date ? $program->start_date->format('Y-m-d') : '';
         $this->formEndDate = $program->end_date ? $program->end_date->format('Y-m-d') : '';
         $this->formContent = $program->content ?? '';
+        $this->formPembina = !empty($program->pembina) && is_array($program->pembina)
+            ? $program->pembina
+            : $this->getDefaultSanghaArray();
         $this->formStatus = $program->status;
         $this->existingCoverImage = $program->cover_image;
         $this->formCoverImage = null;
 
         $this->modalOpen = true;
+    }
+
+    public function loadDefaultSangha(): void
+    {
+        $this->formPembina = $this->getDefaultSanghaArray();
+    }
+
+    public function addPembina(): void
+    {
+        $this->formPembina[] = [
+            'name' => '',
+            'title' => 'Bhikkhu Pembina',
+            'photo' => '',
+        ];
+    }
+
+    public function removePembina(int $index): void
+    {
+        unset($this->formPembina[$index]);
+        $this->formPembina = array_values($this->formPembina);
+    }
+
+    public function selectSanghaToPembina(int $index, int $sanghaMemberId): void
+    {
+        $member = \App\Models\SanghaMember::find($sanghaMemberId);
+        if ($member && isset($this->formPembina[$index])) {
+            $this->formPembina[$index]['name'] = $member->name;
+            $this->formPembina[$index]['title'] = $member->title ?: 'Bhikkhu Pembina';
+            $this->formPembina[$index]['photo'] = $member->photo ?? '';
+        }
+    }
+
+    private function getDefaultSanghaArray(): array
+    {
+        $members = \App\Models\SanghaMember::active()->get();
+        if ($members->isNotEmpty()) {
+            return $members->map(fn($m) => [
+                'name' => $m->name,
+                'title' => $m->title ?: 'Bhikkhu Pembina',
+                'photo' => $m->photo,
+            ])->toArray();
+        }
+
+        return [
+            [
+                'name' => \App\Models\Setting::get('sangha_title', 'Bhikkhu Sangha Vihara Sāmaggi Gāma'),
+                'title' => 'Pembina Spiritual',
+                'photo' => \App\Models\Setting::get('sangha_photo', 'images/bhikkhu-sangha.jpg'),
+            ]
+        ];
     }
 
     public function saveProgram(): void
@@ -89,6 +144,10 @@ new class extends Component
         $targetAmount = (int) $this->formTarget;
         $slug = Str::slug($this->formTitle);
 
+        $cleanPembina = array_values(array_filter($this->formPembina, function ($item) {
+            return !empty(trim($item['name'] ?? ''));
+        }));
+
         if ($this->editingId) {
             $program = DonationProgram::find($this->editingId);
             if ($program) {
@@ -105,6 +164,7 @@ new class extends Component
                     'start_date' => $this->formStartDate ?: null,
                     'end_date' => $this->formEndDate ?: null,
                     'content' => $this->formContent,
+                    'pembina' => !empty($cleanPembina) ? $cleanPembina : null,
                     'status' => $this->formStatus,
                     'cover_image' => $coverImagePath,
                 ]);
@@ -124,6 +184,7 @@ new class extends Component
                 'start_date' => $this->formStartDate ?: null,
                 'end_date' => $this->formEndDate ?: null,
                 'content' => $this->formContent,
+                'pembina' => !empty($cleanPembina) ? $cleanPembina : null,
                 'status' => $this->formStatus,
                 'cover_image' => $coverImagePath ?: 'images/gallery-altar.jpg',
             ]);
@@ -182,6 +243,7 @@ new class extends Component
             'countSemua' => $countSemua,
             'countAktif' => $countAktif,
             'countSelesai' => $countSelesai,
+            'availableSangha' => \App\Models\SanghaMember::active()->get(),
         ])->title('Kelola Program Donasi')->layout('layouts::admin');
     }
 };
@@ -560,6 +622,92 @@ new class extends Component
                             placeholder="Jelaskan tujuan penggalangan dāna ini kepada umat..."
                             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
                         ></textarea>
+                    </div>
+
+                    <!-- Bhikkhu Pembina / Penanggung Jawab Program (Repeater) -->
+                    <div class="space-y-2.5 pt-3 border-t border-stone-200 dark:border-emerald-950">
+                        <div class="flex flex-col gap-2">
+                            <div>
+                                <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                                    Bhikkhu Pembina / Penanggung Jawab Program
+                                </label>
+                                <p class="text-[11px] text-stone-500 dark:text-stone-400">
+                                    Daftar Yang Mulia Bhikkhu yang menaungi program ini (default: Dewan Bhikkhu Sangha).
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button 
+                                    type="button" 
+                                    wire:click="loadDefaultSangha" 
+                                    title="Muat otomatis seluruh Dewan Bhikkhu Sangha aktif"
+                                    class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 cursor-pointer transition-colors"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                    <span>Reset Dewan Sangha</span>
+                                </button>
+                                <button 
+                                    type="button" 
+                                    wire:click="addPembina" 
+                                    class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 cursor-pointer transition-colors"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    <span>Tambah</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            @forelse($formPembina as $index => $item)
+                                <div class="p-2.5 rounded-2xl bg-stone-50 dark:bg-[#071710] border border-stone-200/90 dark:border-emerald-500/20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shadow-2xs">
+                                    @if(isset($availableSangha) && $availableSangha->isNotEmpty())
+                                        <div class="sm:w-36 shrink-0">
+                                            <select 
+                                                wire:change="selectSanghaToPembina({{ $index }}, $event.target.value)" 
+                                                class="w-full px-2 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-300 dark:border-emerald-500/30 text-[11px] text-stone-700 dark:text-stone-300 focus:outline-none focus:border-amber-500"
+                                            >
+                                                <option value="">-- Pilih Sangha --</option>
+                                                @foreach($availableSangha as $sangha)
+                                                    <option value="{{ $sangha->id }}" @selected(($item['name'] ?? '') === $sangha->name)>
+                                                        {{ $sangha->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @endif
+
+                                    <div class="flex-1">
+                                        <input 
+                                            type="text" 
+                                            wire:model="formPembina.{{ $index }}.name" 
+                                            placeholder="Nama Bhikkhu" 
+                                            class="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-300 dark:border-emerald-500/30 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+
+                                    <div class="flex-1">
+                                        <input 
+                                            type="text" 
+                                            wire:model="formPembina.{{ $index }}.title" 
+                                            placeholder="Peran (cth: Pembina Spiritual)" 
+                                            class="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-300 dark:border-emerald-500/30 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+
+                                    <button 
+                                        type="button" 
+                                        wire:click="removePembina({{ $index }})" 
+                                        title="Hapus Pembina Ini"
+                                        class="p-1.5 rounded-lg text-rose-500 hover:text-white hover:bg-rose-500 transition-colors cursor-pointer shrink-0 self-end sm:self-center"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
+                            @empty
+                                <div class="py-2.5 px-3 rounded-xl bg-stone-100 dark:bg-[#071710] border border-dashed border-stone-300 dark:border-emerald-900/60 text-center text-[11px] text-stone-500">
+                                    Belum ada pembina khusus. Program akan otomatis menampilkan seluruh Dewan Bhikkhu Sangha Vihara.
+                                </div>
+                            @endforelse
+                        </div>
                     </div>
 
                     <!-- Status -->
