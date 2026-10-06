@@ -126,4 +126,38 @@ class SettingsTest extends TestCase
         $this->assertNull(Setting::get('foundation_logo'));
         $this->assertNull(Setting::get('foundation_legal_doc'));
     }
+
+    public function test_admin_can_manage_default_donation_admins_repeater(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'Super Administrator',
+            'status' => 'aktif',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test('admin::pengaturan')
+            ->assertSet('defaultAdmins', [
+                ['role' => 'Ketua', 'name' => '', 'phone' => ''],
+                ['role' => 'Sekretaris', 'name' => '', 'phone' => ''],
+                ['role' => 'Bendahara', 'name' => '', 'phone' => ''],
+            ])
+            ->call('addDefaultAdmin')
+            ->assertCount('defaultAdmins', 4)
+            ->set('defaultAdmins.0.name', 'Hendra Wijaya, S.E.')
+            ->set('defaultAdmins.0.phone', '081234567890')
+            ->set('defaultAdmins.1.name', 'Ratna Dewi, S.Kom.')
+            ->set('defaultAdmins.1.phone', '081298765432')
+            ->set('defaultAdmins.2.name', 'Budi Santoso, B.Sc.')
+            ->set('defaultAdmins.2.phone', '081377889900')
+            ->set('defaultAdmins.3.role', 'Koordinator Dana')
+            ->set('defaultAdmins.3.name', 'Upasaka Kevin')
+            ->set('defaultAdmins.3.phone', '081511223344')
+            ->call('saveSettings');
+
+        $saved = json_decode(Setting::get('donation_default_admins'), true);
+        $this->assertIsArray($saved);
+        $this->assertCount(4, $saved);
+        $this->assertEquals('Hendra Wijaya, S.E.', $saved[0]['name']);
+        $this->assertEquals('Koordinator Dana', $saved[3]['role']);
+    }
 }

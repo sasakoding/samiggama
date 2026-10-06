@@ -19,6 +19,7 @@ class DonationProgram extends Model
         'cover_image',
         'content',
         'pembina',
+        'admins',
         'status',
     ];
 
@@ -27,6 +28,7 @@ class DonationProgram extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'pembina' => 'array',
+        'admins' => 'array',
     ];
 
     public function donations()
@@ -124,6 +126,46 @@ class DonationProgram extends Model
                 'title' => 'Pembina Spiritual',
                 'photo_url' => asset(Setting::get('sangha_photo', 'images/bhikkhu-sangha.jpg')),
             ]
+        ]);
+    }
+
+    public static function getDefaultAdmins(): array
+    {
+        $defaultAdminsJson = Setting::get('donation_default_admins');
+        if ($defaultAdminsJson) {
+            $decoded = json_decode($defaultAdminsJson, true);
+            if (is_array($decoded)) {
+                $filtered = array_values(array_filter($decoded, fn($item) => !empty(trim($item['name'] ?? '')) || !empty(trim($item['role'] ?? ''))));
+                if (!empty($filtered)) {
+                    return $filtered;
+                }
+            }
+        }
+
+        return [
+            ['role' => 'Ketua', 'name' => 'Pengurus Yayasan', 'phone' => ''],
+            ['role' => 'Sekretaris', 'name' => 'Sekretariat Vihara', 'phone' => ''],
+            ['role' => 'Bendahara', 'name' => 'Bendahara Yayasan', 'phone' => ''],
+        ];
+    }
+
+    public function getAdminsListAttribute()
+    {
+        if (!empty($this->admins) && is_array($this->admins)) {
+            $filtered = collect($this->admins)->filter(fn($item) => !empty(trim($item['name'] ?? '')))->map(fn($item) => (object) [
+                'role' => $item['role'] ?? 'Pengurus',
+                'name' => $item['name'] ?? '',
+                'phone' => $item['phone'] ?? '',
+            ])->values();
+            if ($filtered->isNotEmpty()) {
+                return $filtered;
+            }
+        }
+
+        return collect(static::getDefaultAdmins())->map(fn($item) => (object) [
+            'role' => $item['role'] ?? 'Pengurus',
+            'name' => $item['name'] ?? '',
+            'phone' => $item['phone'] ?? '',
         ]);
     }
 }

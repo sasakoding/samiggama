@@ -4,17 +4,22 @@ use App\Models\CertificateTemplate;
 use App\Models\Donation;
 use App\Models\DonationProgram;
 use App\Models\IssuedCertificate;
+use App\Services\DonationImportService;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination;
+    use WithFileUploads, WithPagination;
 
     public string $searchQuery = '';
     public string $activeStatusTab = 'semua'; // 'semua', 'verified', 'pending', 'rejected'
     public bool $createModalOpen = false;
     public bool $detailModalOpen = false;
+    public bool $importModalOpen = false;
+    public $importFile = null;
+    public ?array $importSummary = null;
     public ?Donation $selectedDonation = null;
     public ?string $feedbackMessage = null;
 
@@ -64,6 +69,40 @@ new class extends Component
         if ($this->selectedDonation) {
             $this->detailModalOpen = true;
         }
+    }
+
+    public function openImportModal(): void
+    {
+        $this->reset(['importFile', 'importSummary']);
+        $this->importModalOpen = true;
+    }
+
+    public function importExcel(DonationImportService $service): void
+    {
+        $this->validate([
+            'importFile' => 'required|file|max:20480',
+        ], [
+            'importFile.required' => 'Pilih file Excel (.xlsx) atau CSV terlebih dahulu.',
+            'importFile.max' => 'Ukuran file maksimal 20MB.',
+        ]);
+
+        $path = $this->importFile->getRealPath();
+        $result = $service->import($path);
+        $this->importSummary = $result;
+
+        if ($result['imported'] > 0) {
+            $progCount = count($result['created_programs']);
+            $msg = "Berhasil mengimpor {$result['imported']} data donasi.";
+            if ($progCount > 0) {
+                $msg .= " ({$progCount} program baru otomatis dibuat).";
+            }
+            $this->feedbackMessage = $msg;
+        } else {
+            $this->feedbackMessage = "Tidak ada data yang berhasil diimpor. Periksa format file Anda.";
+        }
+
+        $this->importFile = null;
+        $this->resetPage();
     }
 
     public function saveDonation(): void
@@ -204,8 +243,17 @@ new class extends Component
             </p>
         </div>
 
-        <!-- CTA Input Donatur -->
+        <!-- CTA Input Donatur & Import -->
         <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button 
+                wire:click="openImportModal" 
+                type="button" 
+                class="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-white dark:bg-emerald-950/70 hover:bg-stone-50 dark:hover:bg-emerald-900/80 text-stone-800 dark:text-stone-200 font-bold text-xs shadow-xs border border-stone-200 dark:border-emerald-500/30 transition-all cursor-pointer transform hover:-translate-y-0.5"
+            >
+                <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                <span>Import Excel / CSV</span>
+            </button>
+
             <button 
                 wire:click="openCreateModal" 
                 type="button" 
@@ -736,6 +784,192 @@ new class extends Component
                                 Cetak Kuitansi
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    @endif
+
+    <!-- =========================================================================
+         5. MODAL IMPORT EXCEL / CSV
+         ========================================================================= -->
+    @if ($importModalOpen)
+        <template x-teleport="body">
+            <div 
+                x-data 
+                class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+                @keydown.escape.window="$wire.set('importModalOpen', false)"
+            >
+                <div 
+                    @click.away="$wire.set('importModalOpen', false)" 
+                    class="relative w-full max-w-xl rounded-3xl bg-white dark:bg-[#081b13] border border-stone-200 dark:border-emerald-500/20 shadow-2xl p-6 sm:p-8 space-y-6 animate-scale-up"
+                >
+                    <!-- Header -->
+                    <div class="flex items-center justify-between border-b border-stone-200/80 dark:border-emerald-950 pb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base sm:text-lg font-black text-stone-900 dark:text-stone-100">
+                                    Import Data Donasi dari Excel / CSV
+                                </h3>
+                                <p class="text-xs text-stone-500 dark:text-stone-400">
+                                    Unggah file .xlsx atau .csv sesuai format kolom.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button 
+                            wire:click="$set('importModalOpen', false)" 
+                            type="button" 
+                            class="p-2 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded-xl hover:bg-stone-100 dark:hover:bg-emerald-950 transition-colors cursor-pointer"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Format Guide Callout with Table preview matching user image -->
+                    <div class="p-4 rounded-2xl bg-stone-50 dark:bg-[#071710] border border-stone-200 dark:border-emerald-500/20 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-extrabold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                                Format Kolom Yang Dikenali:
+                            </span>
+                            <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                Otomatis Buat Program Baru
+                            </span>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-emerald-900/60 shadow-2xs">
+                            <table class="w-full text-left text-[11px]">
+                                <thead class="bg-[#103E73] text-white font-bold">
+                                    <tr>
+                                        <th class="px-3 py-1.5 border-r border-blue-400/30">KegiatanID</th>
+                                        <th class="px-3 py-1.5 border-r border-blue-400/30">Nama</th>
+                                        <th class="px-3 py-1.5 text-right">Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200 divide-y divide-stone-100 dark:divide-emerald-950">
+                                    <tr>
+                                        <td class="px-3 py-1.5 border-r border-stone-100 dark:border-emerald-950/60 font-semibold text-stone-700 dark:text-stone-300">Thavara Dana Tahap I Pembebasan Lahan</td>
+                                        <td class="px-3 py-1.5 border-r border-stone-100 dark:border-emerald-950/60 font-bold">LENI</td>
+                                        <td class="px-3 py-1.5 text-right font-mono text-emerald-600 dark:text-emerald-400">1000000</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-1.5 border-r border-stone-100 dark:border-emerald-950/60 font-semibold text-stone-700 dark:text-stone-300">Thavara Dana Tahap I Pembebasan Lahan</td>
+                                        <td class="px-3 py-1.5 border-r border-stone-100 dark:border-emerald-950/60 font-bold">BPK. LIAUW ENG LU</td>
+                                        <td class="px-3 py-1.5 text-right font-mono text-emerald-600 dark:text-emerald-400">200000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <ul class="text-[11px] text-stone-600 dark:text-stone-400 space-y-1 pl-1">
+                            <li class="flex items-start gap-1.5">
+                                <span class="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
+                                <span>Kolom <strong>KegiatanID</strong>: Mencari program yang ada. Jika belum ada di sistem, <strong>program baru akan otomatis dibuatkan</strong>.</span>
+                            </li>
+                            <li class="flex items-start gap-1.5">
+                                <span class="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
+                                <span>Kolom <strong>Nama</strong>: Nama donatur yang tercatat.</span>
+                            </li>
+                            <li class="flex items-start gap-1.5">
+                                <span class="text-emerald-600 dark:text-emerald-400 font-bold">✓</span>
+                                <span>Kolom <strong>Jumlah</strong>: Nominal rupiah dāna kebajikan.</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- File Upload Input -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                            Pilih File Excel (.xlsx) / CSV
+                        </label>
+                        <div class="flex items-center justify-center w-full">
+                            <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-stone-300 dark:border-emerald-500/30 border-dashed rounded-2xl cursor-pointer bg-stone-50/50 dark:bg-emerald-950/20 hover:bg-stone-100 dark:hover:bg-emerald-950/40 transition-colors">
+                                <div class="flex flex-col items-center justify-center pt-4 pb-4">
+                                    <svg class="w-7 h-7 mb-1.5 text-stone-400 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                    <p class="text-xs text-stone-600 dark:text-stone-400 font-medium">
+                                        <span class="font-bold text-[#0D5B3A] dark:text-emerald-400">Klik untuk unggah</span> file Excel / CSV
+                                    </p>
+                                    <p class="text-[10px] text-stone-400 dark:text-stone-500">
+                                        Mendukung format .xlsx, .xls, .csv (Maks. 20MB)
+                                    </p>
+                                </div>
+                                <input wire:model="importFile" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+                            </label>
+                        </div>
+                        @error('importFile') 
+                            <p class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{{ $message }}</p> 
+                        @enderror
+
+                        @if ($importFile)
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-500/30 text-xs">
+                                <div class="flex items-center gap-2 truncate">
+                                    <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <span class="font-bold text-emerald-900 dark:text-emerald-200 truncate">{{ $importFile->getClientOriginalName() }}</span>
+                                </div>
+                                <span class="text-[10px] text-stone-400 font-mono">{{ number_format($importFile->getSize() / 1024, 1) }} KB</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Import Summary (if available) -->
+                    @if ($importSummary)
+                        <div class="p-4 rounded-2xl {{ $importSummary['imported'] > 0 ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-500/30 text-emerald-900 dark:text-emerald-200' : 'bg-rose-50 dark:bg-rose-950/60 border border-rose-500/30 text-rose-900 dark:text-rose-200' }} text-xs space-y-2">
+                            <div class="font-extrabold flex items-center gap-1.5">
+                                @if ($importSummary['imported'] > 0)
+                                    <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    <span>Hasil Import: Berhasil memasukkan {{ $importSummary['imported'] }} data donasi!</span>
+                                @else
+                                    <svg class="w-4 h-4 text-rose-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                                    <span>Gagal mengimpor data.</span>
+                                @endif
+                            </div>
+
+                            @if (!empty($importSummary['created_programs']))
+                                <div class="pt-1 border-t border-emerald-500/20 text-[11px] space-y-1">
+                                    <span class="font-bold">Program baru otomatis dibuat ({{ count($importSummary['created_programs']) }}):</span>
+                                    <ul class="list-disc list-inside space-y-0.5 text-stone-700 dark:text-stone-300">
+                                        @foreach ($importSummary['created_programs'] as $pTitle)
+                                            <li>{{ $pTitle }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
+                            @if (!empty($importSummary['errors']))
+                                <div class="pt-1 border-t border-rose-500/20 text-[11px] space-y-0.5 text-rose-700 dark:text-rose-300">
+                                    @foreach (array_slice($importSummary['errors'], 0, 5) as $err)
+                                        <p>• {{ $err }}</p>
+                                    @endforeach
+                                    @if (count($importSummary['errors']) > 5)
+                                        <p class="italic text-[10px]">...dan {{ count($importSummary['errors']) - 5 }} baris lainnya.</p>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- Modal Action Footer -->
+                    <div class="flex items-center justify-end gap-3 pt-2 border-t border-stone-200/80 dark:border-emerald-950">
+                        <button 
+                            wire:click="$set('importModalOpen', false)" 
+                            type="button" 
+                            class="px-4 py-2.5 rounded-xl text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white font-bold text-xs cursor-pointer transition-colors"
+                        >
+                            {{ $importSummary && $importSummary['imported'] > 0 ? 'Selesai' : 'Batal' }}
+                        </button>
+
+                        <button 
+                            wire:click="importExcel" 
+                            wire:loading.attr="disabled"
+                            type="button" 
+                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0D5B3A] hover:bg-[#09472D] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="importExcel">Proses Import Data</span>
+                            <span wire:loading wire:target="importExcel">Memproses Data...</span>
+                        </button>
                     </div>
                 </div>
             </div>

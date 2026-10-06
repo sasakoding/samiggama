@@ -27,6 +27,11 @@
                 'title' => $m->title ?: 'Bhikkhu Pembina',
                 'photo_url' => $m->photo_url,
             ])->values()->all(),
+            'admins' => $prog->admins_list->map(fn($a) => [
+                'role' => $a->role,
+                'name' => $a->name,
+                'phone' => $a->phone,
+            ])->values()->all(),
         ];
     @endphp
     <article 
@@ -146,7 +151,7 @@
             <div class="pt-3.5 border-t border-stone-200/70 dark:border-emerald-950/60 flex items-center gap-2">
                 @if ($isOpen)
                     <button 
-                        @click="openDanaModal('{{ addslashes($prog->title) }}', '{{ addslashes($prog->category) }}', @js($progPayload['pembina']))"
+                        @click="openDanaModal('{{ addslashes($prog->title) }}', '{{ addslashes($prog->category) }}', @js($progPayload['pembina']), @js($progPayload['admins']))"
                         type="button" 
                         class="flex-1 inline-flex items-center justify-center gap-2 bg-[#0D5B3A] hover:bg-[#09472D] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-extrabold py-2.5 px-3.5 rounded-xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
                     >

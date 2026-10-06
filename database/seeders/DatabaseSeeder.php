@@ -69,6 +69,13 @@ class DatabaseSeeder extends Seeder
         Setting::set('routine_schedule_title', 'Penugasan Petugas & Topik Dhammadesana');
         Setting::set('routine_schedule_subtitle', 'Daftar jadwal penugasan Puja Bakti mingguan, penceramah Dhamma, dan pemimpin kebaktian di Vihara Sāmaggi Gāma.');
 
+        // Default Program Donation Admins (Repeater)
+        Setting::set('donation_default_admins', json_encode([
+            ['role' => 'Ketua', 'name' => 'Hendra Wijaya, S.E.', 'phone' => '081234567890'],
+            ['role' => 'Sekretaris', 'name' => 'Ratna Dewi, S.Kom.', 'phone' => '081298765432'],
+            ['role' => 'Bendahara', 'name' => 'Budi Santoso, B.Sc.', 'phone' => '081377889900'],
+        ]));
+
         // 11. Multi-Admin WhatsApp Contacts (Rotator)
         \App\Models\AdminContact::updateOrCreate(
             ['name' => 'Admin Upasaka Budi (Sekretariat)'],

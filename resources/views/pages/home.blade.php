@@ -746,6 +746,31 @@ new class extends Component
                                     </div>
                                 </template>
 
+                                <!-- Admin / Panitia Pelaksana Program Card -->
+                                <template x-if="selectedProgramDetail.admins && selectedProgramDetail.admins.length > 0">
+                                    <div class="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/25 space-y-2">
+                                        <div class="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
+                                            <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#0D5B3A] dark:text-emerald-300">
+                                                Admin / Panitia Pelaksana
+                                            </span>
+                                            <span class="text-[10px] text-stone-500 dark:text-stone-400 font-bold">
+                                                Penanggung Jawab Program
+                                            </span>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <template x-for="(admin, i) in selectedProgramDetail.admins" :key="i">
+                                                <div class="p-2 rounded-xl bg-white/70 dark:bg-emerald-950/40 border border-emerald-500/15 space-y-0.5">
+                                                    <span class="text-[9px] uppercase font-bold text-[#0D6E42] dark:text-emerald-400 block truncate" x-text="admin.role || 'Pengurus'"></span>
+                                                    <div class="text-xs font-black text-stone-900 dark:text-stone-100 truncate" x-text="admin.name"></div>
+                                                    <template x-if="admin.phone">
+                                                        <div class="text-[10px] text-stone-500 font-mono truncate" x-text="admin.phone"></div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+
                                 <!-- Box Transparansi & Anumodana -->
                                 <div class="p-4 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/20 flex items-start gap-3">
                                     <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -768,7 +793,7 @@ new class extends Component
                                 <div class="flex flex-wrap items-center justify-end gap-2.5 w-full sm:w-auto">
                                     <!-- Button Lihat Daftar Donatur -->
                                     <button 
-                                        @click="programDetailModal = false; openItemDonorsModal({id: selectedProgramDetail.id, title: selectedProgramDetail.title, categoryName: selectedProgramDetail.category, collected: selectedProgramDetail.collected, target: selectedProgramDetail.target, percent: selectedProgramDetail.percent, donorsCount: selectedProgramDetail.donorsCount, status: selectedProgramDetail.status})"
+                                        @click="programDetailModal = false; openItemDonorsModal({id: selectedProgramDetail.id, title: selectedProgramDetail.title, categoryName: selectedProgramDetail.category, collected: selectedProgramDetail.collected, target: selectedProgramDetail.target, percent: selectedProgramDetail.percent, donorsCount: selectedProgramDetail.donorsCount, status: selectedProgramDetail.status, pembina: selectedProgramDetail.pembina, admins: selectedProgramDetail.admins})"
                                         type="button" 
                                         class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white dark:bg-emerald-950/70 hover:bg-stone-100 dark:hover:bg-emerald-900 text-[#0D5B3A] dark:text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
                                     >
@@ -779,7 +804,7 @@ new class extends Component
                                     <!-- Button Salurkan Dana (If Open) -->
                                     <template x-if="selectedProgramDetail.isOpen">
                                         <button 
-                                            @click="programDetailModal = false; openDanaModal(selectedProgramDetail.title, selectedProgramDetail.category, selectedProgramDetail.pembina)"
+                                            @click="programDetailModal = false; openDanaModal(selectedProgramDetail.title, selectedProgramDetail.category, selectedProgramDetail.pembina, selectedProgramDetail.admins)"
                                             type="button" 
                                             class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#0D5B3A] hover:bg-[#09472D] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-extrabold py-2.5 px-5 rounded-xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
                                         >
@@ -958,7 +983,7 @@ new class extends Component
                                 <div class="flex items-center gap-2.5 w-full sm:w-auto">
                                     <template x-if="selectedDonorCampaign.status === 'open'">
                                         <button 
-                                            @click="donorModal = false; openDanaModal(selectedDonorCampaign.title, selectedDonorCampaign.categoryName)"
+                                            @click="donorModal = false; openDanaModal(selectedDonorCampaign.title, selectedDonorCampaign.categoryName, selectedDonorCampaign.pembina, selectedDonorCampaign.admins)"
                                             type="button" 
                                             class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#0D5B3A] hover:bg-[#09472D] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-bold py-2.5 px-5 rounded-xl text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
                                         >
@@ -1306,22 +1331,51 @@ new class extends Component
                             </p>
                         </div>
 
-                    </div>
+                        <!-- Panitia Pelaksana & Konfirmasi Dāna Card -->
+                        <div class="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/25 dark:border-emerald-500/20 space-y-2.5 shadow-xs">
+                            <div class="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                                <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#0D5B3A] dark:text-emerald-300">
+                                    Konfirmasi Penyaluran Dāna
+                                </span>
+                                <span class="text-[10.5px] text-[#0D5B3A] dark:text-emerald-300 font-extrabold">
+                                    Panitia Pelaksana
+                                </span>
+                            </div>
 
-                    <!-- Sticky Floating WhatsApp Confirmation Footer (Always Visible Without Scrolling) -->
-                    <div class="p-3.5 sm:px-6 sm:py-3.5 bg-[#FAF5ED]/95 dark:bg-[#0b1c15]/95 backdrop-blur-md border-t border-stone-200/80 dark:border-emerald-950 shadow-lg z-20 space-y-1 shrink-0">
-                        <a 
-                            :href="getWhatsAppConfirmationUrl()"
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            class="w-full inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1EBE5B] text-white font-bold py-3 px-5 rounded-xl shadow-md transition-all text-xs sm:text-sm transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0"><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"></path><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"></path></svg>
-                            <span>Konfirmasi via WhatsApp</span>
-                        </a>
-                        <p class="text-[10px] text-center text-stone-400 dark:text-stone-500 italic">
+                            <div class="space-y-2">
+                                <template x-for="(admin, idx) in (selectedProgramAdmins && selectedProgramAdmins.length > 0 ? selectedProgramAdmins : defaultAdmins)" :key="idx">
+                                    <div class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/80 dark:bg-emerald-950/40 border border-emerald-500/15 dark:border-emerald-500/20 shadow-2xs">
+                                        <div class="space-y-0.5 min-w-0 flex-1">
+                                            <span class="text-[9.5px] uppercase font-extrabold text-[#0D6E42] dark:text-emerald-400 block truncate" x-text="admin.role || 'Pengurus'"></span>
+                                            <h4 class="text-xs sm:text-sm font-black text-[#143D2D] dark:text-[#E8F3EE] truncate" x-text="admin.name"></h4>
+                                            <template x-if="admin.phone">
+                                                <p class="text-[10px] text-stone-500 dark:text-stone-400 font-mono truncate" x-text="admin.phone"></p>
+                                            </template>
+                                        </div>
+
+                                        <a 
+                                            :href="getAdminWhatsAppUrl(admin)"
+                                            target="_blank" 
+                                            rel="noopener noreferrer" 
+                                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#25D366] hover:bg-[#1EBE5B] text-white text-xs font-bold shadow-xs hover:shadow-md transition-all shrink-0 cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
+                                            title="Konfirmasi via WhatsApp"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 shrink-0"><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"></path><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"></path></svg>
+                                            <span>Konfirmasi</span>
+                                        </a>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <p class="text-[10.5px] text-stone-500 dark:text-stone-400 leading-tight px-0.5">
+                                Kirimkan bukti transfer ke salah satu panitia di atas untuk verifikasi donasi Anda.
+                            </p>
+                        </div>
+
+                        <p class="text-[10px] text-center text-stone-400 dark:text-stone-500 italic pt-1 pb-1">
                             Sabbe Sattā Bhavantu Sukhitattā — Semoga kebajikan ini melimpahkan kedamaian.
                         </p>
+
                     </div>
                 </div>
             </div>
@@ -1704,6 +1758,8 @@ new class extends Component
                 selectedCertificate: null,
                 selectedProgramDetail: null,
                 selectedProgramPembina: null,
+                selectedProgramAdmins: @js(\App\Models\DonationProgram::getDefaultAdmins()),
+                defaultAdmins: @js(\App\Models\DonationProgram::getDefaultAdmins()),
                 itemDonorSearch: '',
                 copiedCertRef: false,
                 isDownloadingImg: false,
@@ -1727,10 +1783,11 @@ new class extends Component
                     this.programDetailModal = true;
                 },
 
-                openDanaModal(title, category, pembina = null) {
+                openDanaModal(title, category, pembina = null, admins = null) {
                     this.selectedCampaign = title;
                     this.selectedCategory = category;
                     this.selectedProgramPembina = (pembina && pembina.length > 0) ? pembina : null;
+                    this.selectedProgramAdmins = (admins && admins.length > 0) ? admins : this.defaultAdmins;
                     this.paymentTab = 'bank';
                     this.danaModal = true;
                     this.copiedBankId = null;
@@ -1874,12 +1931,26 @@ new class extends Component
                     }, 2500);
                 },
 
-                getWhatsAppConfirmationUrl() {
+                getAdminWhatsAppUrl(admin) {
                     let method = this.paymentTab === 'bank' 
                         ? ('Transfer ' + (this.selectedBankName || 'Bank')) 
                         : 'QRIS / E-Wallet';
-                    let text = 'Namo Buddhaya Pengurus Vihara Sāmaggi Gāma,\n\nSaya telah menyalurkan dana kebajikan untuk program:\n* ' + (this.selectedCampaign || 'Program Donasi') + ' *\n\nMetode Penyaluran: ' + method + '\n\nMohon konfirmasi dan verifikasi bukti transfer terlampir. Anumodana.';
-                    return 'https://wa.me/{{ $foundationWhatsApp }}?text=' + encodeURIComponent(text);
+                    let targetName = admin && admin.name ? admin.name : 'Pengurus';
+                    let targetRole = admin && admin.role ? admin.role : 'Pengurus';
+                    let text = 'Namo Buddhaya ' + targetRole + ' ' + targetName + ',\n\nSaya telah menyalurkan dana kebajikan untuk program:\n* ' + (this.selectedCampaign || 'Program Donasi') + ' *\n\nMetode Penyaluran: ' + method + '\n\nMohon konfirmasi dan verifikasi bukti transfer terlampir. Anumodana.';
+                    let targetPhone = '{{ $foundationWhatsApp }}';
+                    if (admin && admin.phone) {
+                        let clean = admin.phone.replace(/[^0-9]/g, '');
+                        if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+                        if (clean.length >= 9) targetPhone = clean;
+                    }
+                    return 'https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(text);
+                },
+
+                getWhatsAppConfirmationUrl() {
+                    let adminList = (this.selectedProgramAdmins && this.selectedProgramAdmins.length > 0) ? this.selectedProgramAdmins : this.defaultAdmins;
+                    let targetAdmin = (adminList && adminList.length > 0) ? (adminList.find(a => a.phone && a.phone.trim() !== '') || adminList[0]) : null;
+                    return this.getAdminWhatsAppUrl(targetAdmin);
                 }
             };
         };

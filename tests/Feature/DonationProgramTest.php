@@ -156,6 +156,80 @@ class DonationProgramTest extends TestCase
         $this->assertEquals('Bhikkhu Subhaddho', $program->pembina[0]['name']);
         $this->assertEquals('Ketua Pembangunan', $program->pembina[0]['title']);
     }
+
+    public function test_program_with_custom_admins_returns_admins_list(): void
+    {
+        $program = DonationProgram::create([
+            'title' => 'Program Dāna Renovasi',
+            'slug' => 'program-dana-renovasi',
+            'category' => 'Pembangunan & Sarana',
+            'target_amount' => 20000000,
+            'admins' => [
+                ['role' => 'Ketua', 'name' => 'Budi Gunawan', 'phone' => '08123456789'],
+                ['role' => 'Sekretaris', 'name' => 'Ratna Dewi', 'phone' => '08129876543'],
+                ['role' => 'Bendahara', 'name' => 'Dewi Lestari', 'phone' => '08121112223'],
+                ['role' => 'Koordinator Lapangan', 'name' => 'Andi Wijaya', 'phone' => '08134445556'],
+            ],
+            'status' => 'aktif',
+        ]);
+
+        $this->assertCount(4, $program->admins_list);
+        $this->assertEquals('Budi Gunawan', $program->admins_list[0]->name);
+        $this->assertEquals('Ketua', $program->admins_list[0]->role);
+        $this->assertEquals('Dewi Lestari', $program->admins_list[2]->name);
+        $this->assertEquals('Bendahara', $program->admins_list[2]->role);
+    }
+
+    public function test_program_falls_back_to_settings_default_admins(): void
+    {
+        \App\Models\Setting::set('donation_default_admins', json_encode([
+            ['role' => 'Ketua', 'name' => 'Hendra Wijaya', 'phone' => '081234567890'],
+            ['role' => 'Sekretaris', 'name' => 'Ratna Dewi', 'phone' => '081298765432'],
+            ['role' => 'Bendahara', 'name' => 'Budi Santoso', 'phone' => '081377889900'],
+            ['role' => 'Koordinator Lapangan', 'name' => 'Sdr. Kevin', 'phone' => '081566778899'],
+        ]));
+
+        $program = DonationProgram::create([
+            'title' => 'Program Dāna Bedah Kuti',
+            'slug' => 'program-dana-bedah-kuti',
+            'category' => 'Pembangunan & Sarana',
+            'target_amount' => 25000000,
+            'status' => 'aktif',
+        ]);
+
+        $this->assertCount(4, $program->admins_list);
+        $this->assertEquals('Hendra Wijaya', $program->admins_list[0]->name);
+        $this->assertEquals('Ketua', $program->admins_list[0]->role);
+        $this->assertEquals('Budi Santoso', $program->admins_list[2]->name);
+        $this->assertEquals('Bendahara', $program->admins_list[2]->role);
+        $this->assertEquals('Sdr. Kevin', $program->admins_list[3]->name);
+    }
+
+    public function test_admin_donasi_livewire_creates_program_using_global_default_admins(): void
+    {
+        $admin = \App\Models\User::factory()->create(['role' => 'admin']);
+
+        \App\Models\Setting::set('donation_default_admins', json_encode([
+            ['role' => 'Ketua', 'name' => 'Default Ketua', 'phone' => '081111111'],
+            ['role' => 'Sekretaris', 'name' => 'Default Sekre', 'phone' => '082222222'],
+            ['role' => 'Bendahara', 'name' => 'Default Benda', 'phone' => '083333333'],
+        ]));
+
+        Livewire::actingAs($admin)
+            ->test('admin::donasi')
+            ->call('openCreateModal')
+            ->set('formTitle', 'Program Dāna Bedah Rumah Kuti')
+            ->set('formCategory', 'Pembangunan & Sarana')
+            ->set('formTarget', '30000000')
+            ->call('saveProgram');
+
+        $program = DonationProgram::where('slug', 'program-dana-bedah-rumah-kuti')->first();
+        $this->assertNotNull($program);
+        $this->assertNull($program->admins);
+        $this->assertCount(3, $program->admins_list);
+        $this->assertEquals('Default Ketua', $program->admins_list[0]->name);
+        $this->assertEquals('Ketua', $program->admins_list[0]->role);
+    }
 }
 
 

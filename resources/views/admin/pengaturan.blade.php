@@ -55,6 +55,9 @@ new class extends Component
     public string $socialSpotify = '';
     public string $socialTelegram = '';
 
+    // Susunan Default Admin & Panitia Program Donasi (Repeater)
+    public array $defaultAdmins = [];
+
     public function mount(): void
     {
         // 1. Yayasan & Legalitas
@@ -91,6 +94,22 @@ new class extends Component
         $this->socialWhatsapp = Setting::get('social_whatsapp', 'https://wa.me/6281123456789');
         $this->socialSpotify = Setting::get('social_spotify', '');
         $this->socialTelegram = Setting::get('social_telegram', '');
+
+        // 4. Default Admin & Panitia Program Donasi (Default: Ketua, Sekretaris, Bendahara)
+        $rawDefaultAdmins = Setting::get('donation_default_admins');
+        if ($rawDefaultAdmins) {
+            $decoded = json_decode($rawDefaultAdmins, true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                $this->defaultAdmins = $decoded;
+            }
+        }
+        if (empty($this->defaultAdmins)) {
+            $this->defaultAdmins = [
+                ['role' => 'Ketua', 'name' => '', 'phone' => ''],
+                ['role' => 'Sekretaris', 'name' => '', 'phone' => ''],
+                ['role' => 'Bendahara', 'name' => '', 'phone' => ''],
+            ];
+        }
     }
 
     public function setTab(string $tab): void
@@ -226,6 +245,12 @@ new class extends Component
         Setting::set('social_whatsapp', $this->socialWhatsapp);
         Setting::set('social_spotify', $this->socialSpotify);
         Setting::set('social_telegram', $this->socialTelegram);
+
+        // 5. Save Susunan Default Admin & Panitia Program Donasi
+        $cleanAdmins = array_values(array_filter($this->defaultAdmins, function ($item) {
+            return !empty(trim($item['name'] ?? '')) || !empty(trim($item['role'] ?? ''));
+        }));
+        Setting::set('donation_default_admins', json_encode(!empty($cleanAdmins) ? $cleanAdmins : $this->defaultAdmins));
 
         $this->feedbackMessage = 'Seluruh pengaturan identitas yayasan, rekening, dan saluran media sosial berhasil disimpan ke database.';
     }
@@ -442,11 +467,59 @@ new class extends Component
         }
     }
 
+    // ==========================================
+    // DEFAULT ADMIN PROGRAM DONASI REPEATER
+    // ==========================================
+    public function addDefaultAdmin(): void
+    {
+        $this->defaultAdmins[] = [
+            'role' => 'Anggota Panitia',
+            'name' => '',
+            'phone' => '',
+        ];
+    }
+
+    public function removeDefaultAdmin(int $index): void
+    {
+        unset($this->defaultAdmins[$index]);
+        $this->defaultAdmins = array_values($this->defaultAdmins);
+    }
+
+    public function resetDefaultAdmins(): void
+    {
+        $this->defaultAdmins = [
+            ['role' => 'Ketua', 'name' => '', 'phone' => ''],
+            ['role' => 'Sekretaris', 'name' => '', 'phone' => ''],
+            ['role' => 'Bendahara', 'name' => '', 'phone' => ''],
+        ];
+        $this->feedbackMessage = 'Susunan admin program dikembalikan ke format awal (Ketua, Sekretaris, Bendahara). Klik Simpan untuk menerapkan.';
+    }
+
+    public function selectOfficerToDefaultAdmin(int $index, int $officerId): void
+    {
+        $officer = \App\Models\Officer::find($officerId);
+        if ($officer && isset($this->defaultAdmins[$index])) {
+            $this->defaultAdmins[$index]['name'] = $officer->name;
+        }
+    }
+
+    public function selectContactToDefaultAdmin(int $index, int $contactId): void
+    {
+        $contact = \App\Models\AdminContact::find($contactId);
+        if ($contact && isset($this->defaultAdmins[$index])) {
+            $this->defaultAdmins[$index]['name'] = $contact->name;
+            if (!empty($contact->phone)) {
+                $this->defaultAdmins[$index]['phone'] = $contact->phone;
+            }
+        }
+    }
+
     public function render()
     {
         return $this->view([
             'adminContacts' => \App\Models\AdminContact::orderBy('sort_order')->orderBy('id')->get(),
             'sanghaMembers' => \App\Models\SanghaMember::orderBy('sort_order')->orderBy('id')->get(),
+            'officers' => \App\Models\Officer::orderBy('sort_order')->get(),
         ])->title('Pengaturan Sistem & Yayasan')->layout('layouts::admin');
     }
 };
@@ -494,7 +567,7 @@ new class extends Component
             </p>
         </div>
 
-        @if (in_array($activeTab, ['yayasan', 'rekening', 'sosmed']))
+        @if (in_array($activeTab, ['yayasan', 'rekening', 'sosmed', 'admin_donasi']))
             <button 
                 wire:click="saveSettings" 
                 type="button" 
@@ -565,6 +638,15 @@ new class extends Component
                 <svg class="w-4 h-4 {{ $activeTab === 'sangha' ? 'text-amber-300' : 'text-stone-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 <span>Dewan Bhikkhu Sangha</span>
                 <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400/20 text-amber-800 dark:text-amber-300 font-black">{{ $sanghaMembers->count() }}</span>
+            </button>
+            <button 
+                @click="$wire.setTab('admin_donasi')" 
+                type="button" 
+                class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'admin_donasi' ? 'bg-[#0D5B3A] text-white shadow-xs' : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200/60 dark:hover:bg-emerald-950' }}"
+            >
+                <svg class="w-4 h-4 {{ $activeTab === 'admin_donasi' ? 'text-amber-300' : 'text-stone-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Admin & Panitia Donasi</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400/20 text-amber-800 dark:text-amber-300 font-black">{{ count($defaultAdmins) }}</span>
             </button>
             <button 
                 @click="$wire.setTab('rotator')" 
@@ -1421,6 +1503,175 @@ new class extends Component
             @endif
 
             <!-- =========================================================================
+                 TAB: ADMIN & PANITIA DEFAULT PROGRAM DONASI (REPEATER)
+                 ========================================================================= -->
+            @if ($activeTab === 'admin_donasi')
+                <div class="space-y-6 text-xs">
+                    
+                    <!-- Header Banner -->
+                    <div class="p-5 rounded-3xl bg-gradient-to-r from-stone-900 to-[#071d13] border border-stone-800 dark:border-emerald-900/60 text-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-black text-[10px] uppercase tracking-wider border border-amber-500/30">
+                                    Default Terpusat
+                                </span>
+                                <h3 class="font-black text-sm uppercase tracking-wider text-amber-100">
+                                    Susunan Admin & Panitia Program Donasi
+                                </h3>
+                            </div>
+                            <p class="text-stone-300 text-[11px] max-w-2xl leading-relaxed">
+                                Pengaturan terpusat untuk susunan admin & panitia pelaksana program donasi (awalnya terdiri dari Ketua, Sekretaris, Bendahara, dan dapat ditambah dinamis). Susunan ini otomatis menjadi default pada seluruh program donasi.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button 
+                                type="button" 
+                                wire:click="resetDefaultAdmins" 
+                                title="Kembalikan susunan ke format inti (Ketua, Sekretaris, Bendahara)"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-amber-200 font-bold text-xs border border-white/15 transition-all cursor-pointer"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                <span>Reset Inti</span>
+                            </button>
+                            <button 
+                                type="button" 
+                                wire:click="addDefaultAdmin" 
+                                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0D5B3A] hover:bg-[#0F6B44] text-white font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer"
+                            >
+                                <svg class="w-3.5 h-3.5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                <span>Tambah Posisi Admin</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Repeater Table / Card Container -->
+                    <div class="rounded-3xl bg-white dark:bg-[#071710] border border-stone-200/90 dark:border-emerald-950/80 shadow-md overflow-hidden">
+                        
+                        <div class="p-4 bg-stone-50/70 dark:bg-[#05140d] border-b border-stone-200/80 dark:border-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                            <div class="font-extrabold text-stone-900 dark:text-stone-100 text-xs flex items-center gap-2">
+                                <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <span>Daftar Susunan Admin & Panitia Program (Repeater Dinamis)</span>
+                            </div>
+                            <div class="text-[11px] text-stone-500 dark:text-stone-400 font-semibold">
+                                Total: <strong class="text-stone-800 dark:text-stone-200">{{ count($defaultAdmins) }}</strong> posisi terdaftar
+                            </div>
+                        </div>
+
+                        <div class="p-5 space-y-3">
+                            @forelse($defaultAdmins as $idx => $admin)
+                                <div class="p-3.5 rounded-2xl bg-stone-50/80 dark:bg-[#040e09] border border-stone-200/90 dark:border-emerald-500/20 flex flex-col lg:flex-row items-stretch lg:items-center gap-3 shadow-2xs hover:border-emerald-500/40 transition-colors">
+                                    
+                                    <!-- Index Badge -->
+                                    <div class="w-7 h-7 rounded-xl bg-stone-200 dark:bg-emerald-950/60 text-stone-700 dark:text-emerald-300 font-black text-xs flex items-center justify-center shrink-0">
+                                        #{{ $idx + 1 }}
+                                    </div>
+
+                                    <!-- Role / Jabatan Input -->
+                                    <div class="lg:w-48 shrink-0 space-y-1">
+                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Jabatan / Peran</label>
+                                        <input 
+                                            type="text" 
+                                            wire:model="defaultAdmins.{{ $idx }}.role" 
+                                            placeholder="cth: Ketua / Sekretaris" 
+                                            class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-stone-300 dark:border-emerald-500/30 text-stone-900 dark:text-stone-100 text-xs font-bold focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+
+                                    <!-- Nama Admin Input -->
+                                    <div class="flex-1 space-y-1">
+                                        <div class="flex items-center justify-between">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Nama Lengkap Admin / PIC</label>
+                                            
+                                            <!-- Quick Pick Dropdown -->
+                                            @if(!empty($officers) && $officers->isNotEmpty())
+                                                <div x-data="{ open: false }" class="relative">
+                                                    <button 
+                                                        @click="open = !open" 
+                                                        type="button" 
+                                                        class="text-[10px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                                                    >
+                                                        <span>Pilih dari Pengurus</span>
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                    </button>
+                                                    <div 
+                                                        x-show="open" 
+                                                        @click.away="open = false" 
+                                                        x-cloak 
+                                                        class="absolute right-0 top-full mt-1 w-64 max-h-48 overflow-y-auto bg-white dark:bg-stone-900 border border-stone-200 dark:border-emerald-950 rounded-xl shadow-xl z-20 py-1 text-xs"
+                                                    >
+                                                        @foreach($officers as $officer)
+                                                            <button 
+                                                                type="button" 
+                                                                @click="open = false" 
+                                                                wire:click="selectOfficerToDefaultAdmin({{ $idx }}, {{ $officer->id }})" 
+                                                                class="w-full text-left px-3 py-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors flex items-center justify-between"
+                                                            >
+                                                                <span class="font-semibold text-stone-800 dark:text-stone-200 truncate">{{ $officer->name }}</span>
+                                                                <span class="text-[10px] text-stone-400 shrink-0 ml-1">{{ $officer->division ?? $officer->title }}</span>
+                                                            </button>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            wire:model="defaultAdmins.{{ $idx }}.name" 
+                                            placeholder="Nama lengkap admin penanggung jawab" 
+                                            class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-stone-300 dark:border-emerald-500/30 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+
+                                    <!-- No. WhatsApp Input -->
+                                    <div class="lg:w-48 shrink-0 space-y-1">
+                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">No. WhatsApp (Opsional)</label>
+                                        <input 
+                                            type="text" 
+                                            wire:model="defaultAdmins.{{ $idx }}.phone" 
+                                            placeholder="cth: 081234567890" 
+                                            class="w-full px-3 py-2 rounded-xl bg-white dark:bg-stone-900 border border-stone-300 dark:border-emerald-500/30 text-stone-900 dark:text-stone-100 text-xs font-mono focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+
+                                    <!-- Hapus Baris -->
+                                    <div class="pt-2 lg:pt-5 shrink-0">
+                                        <button 
+                                            type="button" 
+                                            wire:click="removeDefaultAdmin({{ $idx }})" 
+                                            title="Hapus Posisi Admin Ini"
+                                            class="w-full lg:w-auto p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/40 transition-colors cursor-pointer flex items-center justify-center"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
+
+                                </div>
+                            @empty
+                                <div class="py-12 text-center text-stone-400 space-y-3">
+                                    <div class="w-12 h-12 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                                        <svg class="w-6 h-6 fill-none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <div class="text-sm font-extrabold text-stone-700 dark:text-stone-300">Belum ada admin pelaksana donasi</div>
+                                        <p class="text-xs text-stone-400 max-w-sm mx-auto">Klik tombol <strong>Reset Inti</strong> untuk mengisi default (Ketua, Sekretaris, Bendahara), atau klik <strong>+ Tambah Posisi Admin</strong>.</p>
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        wire:click="resetDefaultAdmins" 
+                                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 text-stone-950 font-bold text-xs shadow hover:bg-amber-400 transition-all cursor-pointer"
+                                    >
+                                        <span>Isi Default Inti (Ketua, Sekretaris, Bendahara)</span>
+                                    </button>
+                                </div>
+                            @endforelse
+                        </div>
+
+                    </div>
+
+                </div>
+            @endif
+
+            <!-- =========================================================================
                  TAB 5: WA ADMIN ROTATOR (LOAD BALANCING CONTACTS)
                  ========================================================================= -->
             @if ($activeTab === 'rotator')
@@ -1605,7 +1856,7 @@ new class extends Component
             @endif
 
             <!-- Bottom Save CTA (Hanya untuk Tab yang Memiliki Form Pengaturan) -->
-            @if (in_array($activeTab, ['yayasan', 'rekening', 'sosmed']))
+            @if (in_array($activeTab, ['yayasan', 'rekening', 'sosmed', 'admin_donasi']))
                 <div class="pt-4 border-t border-stone-200 dark:border-emerald-950 flex items-center justify-between">
                     <span class="text-[11px] text-stone-400">
                         Perubahan akan langsung aktif secara global di seluruh halaman website.
