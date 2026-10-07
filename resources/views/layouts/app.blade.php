@@ -159,6 +159,8 @@
         <meta name="apple-mobile-web-app-title" content="Sāmaggi Gāma">
         <meta name="format-detection" content="telephone=no">
 
+        <meta name="google-site-verification" content="9-f-xalK6oXlUnIaj02haX_nzghJ1M2XmBYPqvpwUTA" />
+
         <!-- Favicons & App Icons -->
         <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo/favicon-32x32.png') }}">
         <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/logo/favicon-16x16.png') }}">

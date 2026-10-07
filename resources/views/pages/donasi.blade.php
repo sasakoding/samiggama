@@ -40,24 +40,17 @@ new class extends Component
         $donorsList = $donations->map(function ($d) use ($activeTemplates, $defaultTemplate) {
             $isAlm = preg_match('/\b(alm|almh|mendiang|pattidana|leluhur)\b/i', $d->donor_name . ' ' . ($d->donor_message ?? ''));
 
-            // Match template
-            $matchedTemplate = $d->issuedCertificate?->certificateTemplate;
-            if (!$matchedTemplate && $d->donationProgram?->certificateTemplate) {
+            // Match template only if specifically issued or program has one, and template is active
+            $matchedTemplate = null;
+            if ($d->issuedCertificate?->certificateTemplate && $d->issuedCertificate->certificateTemplate->status === 'aktif') {
+                $matchedTemplate = $d->issuedCertificate->certificateTemplate;
+            } elseif ($d->donationProgram?->certificateTemplate && $d->donationProgram->certificateTemplate->status === 'aktif') {
                 $matchedTemplate = $d->donationProgram->certificateTemplate;
             }
-            if (!$matchedTemplate) {
-                if ($isAlm) {
-                    $matchedTemplate = $activeTemplates->firstWhere('category', 'alm') 
-                        ?? $activeTemplates->firstWhere('category', 'umum') 
-                        ?? $defaultTemplate;
-                } else {
-                    $matchedTemplate = $activeTemplates->firstWhere('category', 'umum') 
-                        ?? $defaultTemplate;
-                }
-            }
 
-            $bgImage = $matchedTemplate?->background_image ? asset($matchedTemplate->background_image) : asset('images/piagam-maha-anumodana.png');
-            $tplName = $matchedTemplate?->name ?? ($isAlm ? 'Piagam Pelimpahan Jasa Pattidāna' : 'Piagam Maha Anumodana');
+            $hasCertificate = !empty($matchedTemplate) && !empty($matchedTemplate->background_image);
+            $bgImage = $hasCertificate ? asset($matchedTemplate->background_image) : null;
+            $tplName = $hasCertificate ? $matchedTemplate->name : null;
 
             return [
                 'id' => $d->id,
@@ -71,6 +64,7 @@ new class extends Component
                 'ref' => $d->invoice_number,
                 'certNo' => $d->issuedCertificate?->certificate_number ?? ('PA/' . $d->created_at->format('Y/m') . '/' . str_pad($d->id, 4, '0', STR_PAD_LEFT)),
                 'status' => 'Tervalidasi',
+                'hasCertificate' => (bool) $hasCertificate,
                 'templateBg' => $bgImage,
                 'templateName' => $tplName,
             ];
@@ -395,14 +389,19 @@ new class extends Component
                                         <span class=" font-black text-sm text-[#0D5B3A] dark:text-emerald-400 block min-w-35" x-text="donor.amount"></span>
                                     </td>
                                     <td class="py-4 px-5 text-right">
-                                        <button 
-                                            @click="openCertificateModal(donor)"
-                                            type="button" 
-                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer shadow-2xs hover:scale-105"
-                                        >
-                                            <svg class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                            <span>Piagam</span>
-                                        </button>
+                                        <template x-if="donor.hasCertificate">
+                                            <button 
+                                                @click="openCertificateModal(donor)"
+                                                type="button" 
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer shadow-2xs hover:scale-105"
+                                            >
+                                                <svg class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                <span>Piagam</span>
+                                            </button>
+                                        </template>
+                                        <template x-if="!donor.hasCertificate">
+                                            <span class="text-xs text-stone-400 font-medium italic">-</span>
+                                        </template>
                                     </td>
                                 </tr>
                             </template>
@@ -736,13 +735,18 @@ new class extends Component
                                                         </td>
                                                         <td class="py-3 px-4 font-black text-amber-600 dark:text-amber-400 whitespace-nowrap tabular-nums" x-text="d.amount"></td>
                                                         <td class="py-3 px-4 text-right whitespace-nowrap">
-                                                            <button 
-                                                                @click="openCertificateModal(d)"
-                                                                type="button" 
-                                                                class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-bold border border-amber-500/30 cursor-pointer transition-all hover:scale-105"
-                                                            >
-                                                                Piagam
-                                                            </button>
+                                                            <template x-if="d.hasCertificate">
+                                                                <button 
+                                                                    @click="openCertificateModal(d)"
+                                                                    type="button" 
+                                                                    class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-bold border border-amber-500/30 cursor-pointer transition-all hover:scale-105"
+                                                                >
+                                                                    Piagam
+                                                                </button>
+                                                            </template>
+                                                            <template x-if="!d.hasCertificate">
+                                                                <span class="text-[11px] text-stone-400 font-medium italic">-</span>
+                                                            </template>
                                                         </td>
                                                     </tr>
                                                 </template>
@@ -1207,6 +1211,7 @@ new class extends Component
                 },
 
                 openCertificateModal(donor) {
+                    if (!donor || !donor.hasCertificate) return;
                     this.selectedCertificate = donor;
                     this.certificateModal = true;
                     this.copiedCertRef = false;

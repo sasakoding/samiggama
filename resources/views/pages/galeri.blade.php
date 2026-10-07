@@ -10,34 +10,7 @@ new class extends Component
     {
         $albums = GalleryAlbum::with('photos')->latest()->get();
 
-        if ($albums->isEmpty()) {
-            $defaultItems = [
-                ['title' => 'Prosesi Pradaksina Lilin Perdamaian Waisak', 'category' => 'Hari Raya', 'location' => 'Pelataran Stupa Utama', 'event_date' => '2026-05-23', 'description' => 'Ratusan umat berbusana putih mengelilingi stupa dengan membawa pelita lilin teratai seraya mendaraskan paritta suci.', 'cover_image' => 'images/gallery-pradaksina.jpg'],
-                ['title' => 'Tradisi Pindapata Akbar Pagi Bersama Bhikkhu Sangha', 'category' => 'Puja Bakti', 'location' => 'Rute Desa Vihara', 'event_date' => '2026-06-15', 'description' => 'Momen penuh berkah saat umat berbaris dengan rasa hormat mempersembahkan dana makanan.', 'cover_image' => 'images/gallery-pindapata.jpg'],
-                ['title' => 'Puja Chanting Paritta & Penerangan Pelita Lilin', 'category' => 'Puja Bakti', 'location' => 'Dhammasala Utama', 'event_date' => '2026-07-02', 'description' => 'Pendarasan bait-bait suci ajaran Sang Buddha di hadapan altar kayu jati berukir.', 'cover_image' => 'images/kegiatan-chanting.jpg'],
-                ['title' => 'Taman Teratai Hening & Jembatan Refleksi Zen', 'category' => 'Sarana Vihara', 'location' => 'Taman Kolam Teratai', 'event_date' => '2026-07-10', 'description' => 'Bunga teratai mekar di atas kolam jernih simbol kesucian batin.', 'cover_image' => 'images/gallery-zen-garden.jpg'],
-                ['title' => 'Sekolah Minggu Buddhis di Bawah Pohon Bodhi', 'category' => 'Pembinaan Umat', 'location' => 'Taman Pohon Bodhi', 'event_date' => '2026-07-20', 'description' => 'Anak-anak dan remaja belajar meditasi dan nilai-nilai budi pekerti.', 'cover_image' => 'images/kegiatan-smb.jpg'],
-                ['title' => 'Keagungan Altar Utama Buddha Sakyamuni', 'category' => 'Puja Bakti', 'location' => 'Ruang Altar Utama', 'event_date' => '2026-08-01', 'description' => 'Rupang Buddha emas agung dengan dekorasi teratai dan persembahan pelita.', 'cover_image' => 'images/gallery-altar.jpg'],
-                ['title' => 'Penyaluran Paket Berkah Bakti Sosial Kemanusiaan', 'category' => 'Bakti Sosial', 'location' => 'Balai Warga Prasejahtera', 'event_date' => '2026-08-10', 'description' => 'Bakti nyata cinta kasih universal (Mettā) pembagian sembako berkah.', 'cover_image' => 'images/news-baksos.jpg'],
-                ['title' => 'Kemegahan Arsitektur Interior Ruang Dhammasala', 'category' => 'Sarana Vihara', 'location' => 'Dhammasala Utama', 'event_date' => '2026-08-15', 'description' => 'Interior hening berlantai marmer dengan tata akustik dan pencahayaan hangat.', 'cover_image' => 'images/gallery-dhammasala.jpg'],
-            ];
-
-            foreach ($defaultItems as $item) {
-                GalleryAlbum::create([
-                    'title' => $item['title'],
-                    'slug' => Str::slug($item['title']),
-                    'category' => $item['category'],
-                    'location' => $item['location'],
-                    'event_date' => $item['event_date'],
-                    'description' => $item['description'],
-                    'cover_image' => $item['cover_image'],
-                ]);
-            }
-
-            $albums = GalleryAlbum::with('photos')->latest()->get();
-        }
-
-        $categories = $albums->pluck('category')->unique()->values();
+        $categories = $albums->pluck('category')->filter()->unique()->values();
 
         $galleryItems = $albums->map(function ($alb) {
             $photoUrls = $alb->photos->map(fn($p) => asset($p->image_path))->toArray();
@@ -182,7 +155,7 @@ new class extends Component
         <!-- ==========================================
              SECTION 3: MASONRY & CARD GRID SHOWCASE
              ========================================== -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        <div x-show="filteredItems.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             <template x-for="(item, index) in filteredItems" :key="item.id">
                 <article 
                     @click="openLightbox(index)"
@@ -242,6 +215,14 @@ new class extends Component
                     </div>
                 </article>
             </template>
+        </div>
+
+        <!-- Empty State (Jika Kosong) -->
+        <div x-show="filteredItems.length === 0" x-cloak class="py-16 text-center space-y-3">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-stone-200/50 dark:bg-emerald-950/40 border border-stone-300/40 dark:border-emerald-500/20 flex items-center justify-center text-stone-400 dark:text-stone-500">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <p class="text-sm font-bold text-stone-500 dark:text-stone-400">Belum ada album dokumentasi yang dipublikasikan.</p>
         </div>
 
         <!-- ==========================================

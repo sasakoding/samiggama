@@ -389,9 +389,7 @@ new #[Layout('layouts.admin')] class extends Component
                             <span class="absolute left-3.5 top-2.5 font-bold text-stone-400">Rp</span>
                             <input 
                                 wire:model="formAmount" 
-                                type="number" 
-                                min="1"
-                                step="1000"
+                                type="text" 
                                 placeholder="500000" 
                                 class="w-full pl-11 pr-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-emerald-500 font-bold"
                             />

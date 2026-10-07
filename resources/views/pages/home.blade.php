@@ -65,18 +65,9 @@ new class extends Component
                 $matchedTemplate = $allTemplates->firstWhere('id', $d->donationProgram->certificate_template_id);
             }
 
-            if (!$matchedTemplate) {
-                if ($isAlm && $pattidanaTemplate) {
-                    $matchedTemplate = $pattidanaTemplate;
-                } else {
-                    $matchedTemplate = $allTemplates->firstWhere('category_target', $d->donationProgram?->category) 
-                        ?? $allTemplates->firstWhere('category_target', $d->donationProgram?->title)
-                        ?? $defaultTemplate;
-                }
-            }
-
-            $bgImage = $matchedTemplate?->background_image ? asset($matchedTemplate->background_image) : asset('images/piagam-maha-anumodana.png');
-            $tplName = $matchedTemplate?->name ?? ($isAlm ? 'Piagam Pelimpahan Jasa Pattidāna' : 'Piagam Maha Anumodana');
+            $hasCertificate = !empty($matchedTemplate) && !empty($matchedTemplate->background_image);
+            $bgImage = $hasCertificate ? asset($matchedTemplate->background_image) : null;
+            $tplName = $hasCertificate ? $matchedTemplate->name : null;
 
             return [
                 'id' => $d->id,
@@ -90,6 +81,7 @@ new class extends Component
                 'ref' => $d->invoice_number,
                 'certNo' => $d->issuedCertificate?->certificate_number ?? ('PA/' . ($d->created_at ? $d->created_at->format('Y/m') : date('Y/m')) . '/' . str_pad($d->id, 4, '0', STR_PAD_LEFT)),
                 'status' => 'Tervalidasi',
+                'hasCertificate' => (bool) $hasCertificate,
                 'templateBg' => $bgImage,
                 'templateName' => $tplName,
             ];
@@ -942,13 +934,18 @@ new class extends Component
                                                         </td>
                                                         <td class="py-3 px-4 font-black text-amber-600 dark:text-amber-400 whitespace-nowrap tabular-nums" x-text="d.amount"></td>
                                                         <td class="py-3 px-4 text-right whitespace-nowrap">
-                                                            <button 
-                                                                @click="openCertificateModal(d)"
-                                                                type="button" 
-                                                                class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-bold border border-amber-500/30 cursor-pointer transition-all hover:scale-105"
-                                                            >
-                                                                Piagam
-                                                            </button>
+                                                            <template x-if="d.hasCertificate">
+                                                                <button 
+                                                                    @click="openCertificateModal(d)"
+                                                                    type="button" 
+                                                                    class="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-bold border border-amber-500/30 cursor-pointer transition-all hover:scale-105"
+                                                                >
+                                                                    Piagam
+                                                                </button>
+                                                            </template>
+                                                            <template x-if="!d.hasCertificate">
+                                                                <span class="text-[11px] text-stone-400 font-medium italic">-</span>
+                                                            </template>
                                                         </td>
                                                     </tr>
                                                 </template>
@@ -1809,6 +1806,7 @@ new class extends Component
                 },
 
                 openCertificateModal(donor) {
+                    if (!donor || !donor.hasCertificate) return;
                     this.selectedCertificate = donor;
                     this.certificateModal = true;
                     this.copiedCertRef = false;

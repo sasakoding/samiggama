@@ -415,6 +415,10 @@ new class extends Component
                                 <option value="Sarana Vihara">Sarana & Dhammasala</option>
                                 <option value="Bakti Sosial">Bakti Sosial</option>
                                 <option value="Sekolah Minggu">Sekolah Minggu</option>
+                                <option value="Rapat">Rapat</option>
+                                <option value="Kunjungan">Kunjungan</option>
+                                <option value="Hari Raya">Hari Raya</option>
+                                <option value="Kegiatan Lainnya">Kegiatan Lainnya</option>
                             </select>
                         </div>
 
