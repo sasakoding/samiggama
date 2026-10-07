@@ -93,7 +93,7 @@
                             @endforeach
                         </div>
                         <span class="text-[10px] font-bold text-amber-200 tracking-wide">
-                            {{ $progSangha->count() > 1 ? 'Dewan Sangha' : 'Bhikkhu Pembina' }}
+                            Mengetahui
                         </span>
                     </div>
                 @endif

@@ -24,6 +24,7 @@ new class extends Component
     public ?string $feedbackMessage = null;
 
     // Form inputs for recording new donation
+    public ?int $editingDonationId = null;
     public ?int $formProgramId = null;
     public string $formDonorName = '';
     public string $formPhone = '';
@@ -58,6 +59,7 @@ new class extends Component
     public function openCreateModal(): void
     {
         $this->reset(['formDonorName', 'formPhone', 'formAmount']);
+        $this->editingDonationId = null;
         $this->formCategory = 'umum';
         $this->formCertificateTemplateId = null;
         
@@ -76,6 +78,24 @@ new class extends Component
             $this->formCertificateTemplateId = $defaultTpl?->id;
         }
 
+        $this->createModalOpen = true;
+    }
+
+    public function openEditModal(int $id): void
+    {
+        $donation = Donation::with(['donationProgram', 'issuedCertificate.certificateTemplate'])->find($id);
+        if (!$donation) return;
+
+        $this->editingDonationId = $donation->id;
+        $this->formProgramId = $donation->donation_program_id;
+        $this->formDonorName = $donation->donor_name;
+        $this->formPhone = $donation->phone ?? '';
+        $isAlm = ($donation->donor_message && str_contains(strtolower($donation->donor_message), 'pattid')) || str_contains(strtolower($donation->donor_name), 'alm');
+        $this->formCategory = $isAlm ? 'alm' : 'umum';
+        $this->formCertificateTemplateId = $donation->issuedCertificate?->certificate_template_id;
+        $this->formAmount = (string) $donation->amount;
+
+        $this->detailModalOpen = false;
         $this->createModalOpen = true;
     }
 
@@ -137,6 +157,50 @@ new class extends Component
         ]);
 
         $cleanAmount = (int) $this->formAmount;
+        $categoryLabel = $this->formCategory === 'alm' ? 'Pelimpahan Jasa (Alm.)' : 'Donatur Umum';
+
+        if ($this->editingDonationId) {
+            $donation = Donation::find($this->editingDonationId);
+            if ($donation) {
+                $donation->update([
+                    'donation_program_id' => $this->formProgramId,
+                    'donor_name' => $this->formDonorName,
+                    'phone' => $this->formPhone ?: null,
+                    'amount' => $cleanAmount,
+                    'total_amount' => $cleanAmount,
+                    'donor_message' => $this->formCategory === 'alm' ? 'Pelimpahan Jasa (Pattidāna / Alm.)' : null,
+                ]);
+
+                // Sync issued certificate
+                if ($this->formCertificateTemplateId) {
+                    if ($donation->issuedCertificate) {
+                        $donation->issuedCertificate->update([
+                            'certificate_template_id' => $this->formCertificateTemplateId,
+                            'recipient_name' => $donation->donor_name,
+                            'amount' => $cleanAmount,
+                        ]);
+                    } else {
+                        $certNumber = 'PA/' . date('Y/m') . '/' . str_pad($donation->id, 4, '0', STR_PAD_LEFT);
+                        IssuedCertificate::create([
+                            'certificate_number' => $certNumber,
+                            'donation_id' => $donation->id,
+                            'certificate_template_id' => $this->formCertificateTemplateId,
+                            'recipient_name' => $donation->donor_name,
+                            'amount' => $cleanAmount,
+                            'issued_date' => now(),
+                        ]);
+                    }
+                } else {
+                    $donation->issuedCertificate()?->delete();
+                }
+
+                $this->createModalOpen = false;
+                $this->feedbackMessage = "Data donasi {$donation->invoice_number} berhasil diperbarui.";
+                $this->editingDonationId = null;
+                return;
+            }
+        }
+
         $datePrefix = date('Ymd');
         $countToday = Donation::whereDate('created_at', today())->count() + 1;
         $invoiceNumber = 'DN-' . $datePrefix . '-' . str_pad($countToday, 4, '0', STR_PAD_LEFT);
@@ -167,7 +231,6 @@ new class extends Component
         }
 
         $this->createModalOpen = false;
-        $categoryLabel = $this->formCategory === 'alm' ? 'Pelimpahan Jasa (Alm.)' : 'Donatur Umum';
         $this->feedbackMessage = "Pencatatan donasi {$categoryLabel} dari '{$this->formDonorName}' sebesar Rp " . number_format($cleanAmount, 0, ',', '.') . " berhasil disimpan ({$invoiceNumber}).";
     }
 
@@ -443,6 +506,16 @@ new class extends Component
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                     </button>
 
+                                    <!-- Edit Donasi -->
+                                    <button 
+                                        wire:click="openEditModal({{ $don->id }})" 
+                                        type="button" 
+                                        class="w-8 h-8 rounded-xl flex items-center justify-center bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-400 transition-all cursor-pointer border border-amber-500/20 shadow-2xs"
+                                        title="Edit Transaksi & Donatur"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    </button>
+
                                     <!-- Hapus -->
                                     <button 
                                         wire:click="deleteDonation({{ $don->id }})" 
@@ -499,8 +572,12 @@ new class extends Component
                 <!-- Header -->
                 <div class="p-6 bg-gradient-to-r from-[#0B2117] to-[#0F3325] text-white flex items-center justify-between border-b border-emerald-900">
                     <div class="space-y-0.5">
-                        <h3 class="text-lg font-extrabold text-[#FAF5ED]">Input Donatur & Dāna Masuk</h3>
-                        <p class="text-xs text-stone-300">Catat penerimaan dāna donatur dan terbitkan piagam penghargaan.</p>
+                        <h3 class="text-lg font-extrabold text-[#FAF5ED]">
+                            {{ $editingDonationId ? 'Edit Data Donasi & Donatur' : 'Input Donatur & Dāna Masuk' }}
+                        </h3>
+                        <p class="text-xs text-stone-300">
+                            {{ $editingDonationId ? 'Perbarui informasi donatur, program kebajikan, nominal, atau desain piagam.' : 'Catat penerimaan dāna donatur dan terbitkan piagam penghargaan.' }}
+                        </p>
                     </div>
                     <button 
                         @click="$wire.createModalOpen = false" 
@@ -665,9 +742,7 @@ new class extends Component
                         </label>
                         <input 
                             wire:model.live="formAmount" 
-                            type="number" 
-                            min="1000"
-                            step="1000"
+                            type="text" 
                             required 
                             placeholder="cth: 1000000"
                             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10"
@@ -692,7 +767,7 @@ new class extends Component
                             type="submit" 
                             class="py-2.5 px-5 rounded-xl bg-[#0D5B3A] hover:bg-[#0F6B44] text-white font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer"
                         >
-                            Simpan Donatur Masuk
+                            {{ $editingDonationId ? 'Simpan Perubahan' : 'Simpan Donatur Masuk' }}
                         </button>
                     </div>
 
@@ -791,6 +866,15 @@ new class extends Component
                                     <span>Kirim Konfirmasi WA</span>
                                 </a>
                             @endif
+
+                            <button 
+                                wire:click="openEditModal({{ $selectedDonation->id }})" 
+                                type="button" 
+                                class="py-2 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                <span>Edit Data</span>
+                            </button>
 
                             <button 
                                 @click="window.print()" 

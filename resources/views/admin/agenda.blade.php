@@ -19,12 +19,12 @@ new class extends Component
 
     // Form inputs
     public string $formTitle = '';
-    public string $formCategory = '';
+    public string $formCategory = 'Hari Raya Buddhis';
     public string $formEventDate = '';
-    public string $formStartTime = '';
+    public string $formStartTime = '08:00';
     public string $formEndTime = '';
-    public string $formScheduleType = '';
-    public string $formLocation = '';
+    public string $formScheduleType = 'Acara Khusus';
+    public string $formLocation = 'Dhammasala Utama';
     public string $formLeader = '';
     public string $formDescription = '';
     public string $formStatus = 'aktif';
@@ -75,19 +75,19 @@ new class extends Component
         $this->reset([
             'editingId',
             'formTitle',
-            'formEventDate',
             'formLeader',
             'formDescription',
             'formCoverImage',
             'existingCoverImage',
             'formActivities',
         ]);
-        $this->formCategory = '';
-        $this->formEventDate = '';
-        $this->formStartTime = '';
+        $this->resetErrorBag();
+        $this->formCategory = 'Hari Raya Buddhis';
+        $this->formEventDate = date('Y-m-d');
+        $this->formStartTime = '08:00';
         $this->formEndTime = '';
-        $this->formScheduleType = '';
-        $this->formLocation = '';
+        $this->formScheduleType = 'Acara Khusus';
+        $this->formLocation = 'Dhammasala Utama';
         $this->formStatus = 'aktif';
         $this->modalOpen = true;
     }
@@ -99,14 +99,15 @@ new class extends Component
             return;
         }
 
+        $this->resetErrorBag();
         $this->editingId = $sch->id;
         $this->formTitle = $sch->title;
         $this->formCategory = $sch->category;
         $this->formEventDate = $sch->event_date ? $sch->event_date->format('Y-m-d') : '';
-        $this->formStartTime = substr($sch->start_time, 0, 5);
+        $this->formStartTime = $sch->start_time ? substr($sch->start_time, 0, 5) : '08:00';
         $this->formEndTime = $sch->end_time ? substr($sch->end_time, 0, 5) : '';
-        $this->formScheduleType = $sch->schedule_type;
-        $this->formLocation = $sch->location;
+        $this->formScheduleType = $sch->schedule_type ?: 'Acara Khusus';
+        $this->formLocation = $sch->location ?: 'Dhammasala Utama';
         $this->formLeader = $sch->leader ?? '';
         $this->formDescription = $sch->description ?? '';
         $this->formStatus = $sch->status;
@@ -123,8 +124,14 @@ new class extends Component
             'formTitle' => 'required|string|max:255',
             'formCategory' => 'required|string',
             'formEventDate' => 'required|date',
-            'formStartTime' => 'required',
+            'formStartTime' => 'nullable',
             'formCoverImage' => 'nullable|image|max:10240',
+        ], [
+            'formTitle.required' => 'Nama / Judul kegiatan atau hari libur wajib diisi.',
+            'formCategory.required' => 'Kategori kegiatan wajib dipilih.',
+            'formEventDate.required' => 'Tanggal pelaksanaan wajib diisi.',
+            'formCoverImage.image' => 'File sampul harus berupa gambar valid.',
+            'formCoverImage.max' => 'Ukuran gambar maksimal 10MB.',
         ]);
 
         $coverImagePath = $this->existingCoverImage;
@@ -133,7 +140,7 @@ new class extends Component
             ImageUploadService::cleanLivewireTmp();
         }
 
-        $slug = Str::slug($this->formTitle);
+        $slug = Str::slug($this->formTitle) ?: 'agenda-' . time();
 
         // Sanitize activities array
         $cleanedActivities = [];
@@ -151,6 +158,10 @@ new class extends Component
             }
         }
 
+        $startTime = !empty($this->formStartTime) ? $this->formStartTime : '08:00';
+        $scheduleType = !empty($this->formScheduleType) ? $this->formScheduleType : ($this->formCategory === 'Hari Libur Nasional' ? 'Hari Libur' : 'Acara Khusus');
+        $location = !empty($this->formLocation) ? $this->formLocation : ($this->formCategory === 'Hari Libur Nasional' ? 'Nasional / Seluruh Indonesia' : 'Dhammasala Utama');
+
         if ($this->editingId) {
             $sch = Schedule::find($this->editingId);
             if ($sch) {
@@ -163,10 +174,10 @@ new class extends Component
                     'slug' => $slug,
                     'category' => $this->formCategory,
                     'event_date' => $this->formEventDate,
-                    'start_time' => $this->formStartTime,
+                    'start_time' => $startTime,
                     'end_time' => $this->formEndTime ?: null,
-                    'schedule_type' => $this->formScheduleType,
-                    'location' => $this->formLocation,
+                    'schedule_type' => $scheduleType,
+                    'location' => $location,
                     'leader' => $this->formLeader ?: null,
                     'description' => $this->formDescription ?: null,
                     'activities' => count($cleanedActivities) > 0 ? $cleanedActivities : null,
@@ -186,10 +197,10 @@ new class extends Component
                 'slug' => $slug,
                 'category' => $this->formCategory,
                 'event_date' => $this->formEventDate,
-                'start_time' => $this->formStartTime,
+                'start_time' => $startTime,
                 'end_time' => $this->formEndTime ?: null,
-                'schedule_type' => $this->formScheduleType,
-                'location' => $this->formLocation,
+                'schedule_type' => $scheduleType,
+                'location' => $location,
                 'leader' => $this->formLeader ?: null,
                 'description' => $this->formDescription ?: null,
                 'activities' => count($cleanedActivities) > 0 ? $cleanedActivities : null,
@@ -563,6 +574,20 @@ new class extends Component
                 <!-- Form -->
                 <form wire:submit.prevent="saveSchedule" class="p-6 space-y-4 overflow-y-auto text-xs custom-scrollbar">
                     
+                    @if ($errors->any())
+                        <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs space-y-1">
+                            <div class="font-bold flex items-center gap-1.5 text-rose-800 dark:text-rose-200">
+                                <svg class="w-4 h-4 text-rose-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                <span>Mohon lengkapi formulir dengan benar:</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-0.5 text-[11px]">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <div class="space-y-1.5">
                         <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
                             Nama / Judul Kegiatan atau Hari Libur <span class="text-amber-500">*</span>
@@ -574,6 +599,7 @@ new class extends Component
                             placeholder="cth: Hari Raya Trisuci Waisak 2570 BE / Tahun Baru Imlek"
                             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 font-bold"
                         />
+                        @error('formTitle') <span class="text-rose-500 text-[11px] font-medium block">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -594,6 +620,7 @@ new class extends Component
                                 <option value="Bakti Sosial">Bakti Sosial & Donor Darah</option>
                                 <option value="Lainnya">Kegiatan Lainnya</option>
                             </select>
+                            @error('formCategory') <span class="text-rose-500 text-[11px] font-medium block">{{ $message }}</span> @enderror
                         </div>
 
                         <div class="space-y-1.5">
@@ -606,20 +633,21 @@ new class extends Component
                                 required 
                                 class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500 font-bold"
                             />
+                            @error('formEventDate') <span class="text-rose-500 text-[11px] font-medium block">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div class="space-y-1.5">
                             <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
-                                Jam Mulai <span class="text-amber-500">*</span>
+                                Jam Mulai <span class="text-stone-400 font-normal text-[10px]">(Opsional untuk Libur)</span>
                             </label>
                             <input 
                                 wire:model="formStartTime" 
                                 type="time" 
-                                required 
                                 class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
                             />
+                            @error('formStartTime') <span class="text-rose-500 text-[11px] font-medium block">{{ $message }}</span> @enderror
                         </div>
 
                         <div class="space-y-1.5">
@@ -670,6 +698,7 @@ new class extends Component
                             accept="image/*"
                             class="w-full text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-stone-100 dark:file:bg-emerald-950 file:text-stone-700 dark:file:text-stone-300 hover:file:bg-stone-200 cursor-pointer"
                         />
+                        @error('formCoverImage') <span class="text-rose-500 text-[11px] font-medium block">{{ $message }}</span> @enderror
                         <div wire:loading wire:target="formCoverImage" class="text-amber-500 text-[11px] font-semibold">
                             Mengunggah dan mengompresi gambar...
                         </div>
@@ -828,9 +857,12 @@ new class extends Component
                         </button>
                         <button 
                             type="submit" 
-                            class="py-2.5 px-5 rounded-xl bg-[#0D5B3A] hover:bg-[#0F6B44] text-white font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer"
+                            wire:loading.attr="disabled"
+                            class="py-2.5 px-5 rounded-xl bg-[#0D5B3A] hover:bg-[#0F6B44] text-white font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                         >
-                            {{ $editingId ? 'Simpan Perubahan' : 'Simpan Jadwal' }}
+                            <svg wire:loading wire:target="saveSchedule" class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            <span wire:loading.remove wire:target="saveSchedule">{{ $editingId ? 'Simpan Perubahan' : 'Simpan Jadwal' }}</span>
+                            <span wire:loading wire:target="saveSchedule">Menyimpan...</span>
                         </button>
                     </div>
 

@@ -529,7 +529,6 @@ new class extends Component
                                             <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300">
                                                 Bhikkhu Pembina / Penanggung Jawab
                                             </span>
-                                            <span class="text-[10px] text-amber-900 dark:text-amber-300 font-extrabold" x-text="selectedProgramDetail.pembina.length > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina'"></span>
                                         </div>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             <template x-for="(m, i) in selectedProgramDetail.pembina" :key="i">
@@ -1047,9 +1046,6 @@ new class extends Component
                             <div class="flex items-center justify-between border-b border-amber-500/20 pb-2">
                                 <span class="text-[9.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-300">
                                     Mengetahui
-                                </span>
-                                <span class="text-[10.5px] text-amber-900 dark:text-amber-300 font-extrabold" x-text="selectedProgramPembina && selectedProgramPembina.length > 0 ? (selectedProgramPembina.length > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina') : '{{ $sanghaMembers->count() > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina' }}'">
-                                    {{ $sanghaMembers->count() > 1 ? 'Dewan Bhikkhu Sangha' : 'Bhikkhu Pembina' }}
                                 </span>
                             </div>
 
