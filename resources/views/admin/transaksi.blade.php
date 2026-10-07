@@ -45,20 +45,36 @@ new class extends Component
         $this->formCertificateTemplateId = $defaultTpl?->id;
     }
 
+    public function updatedFormProgramId(?int $value): void
+    {
+        if ($value && $this->formCategory === 'umum') {
+            $prog = DonationProgram::find($value);
+            if ($prog && $prog->certificate_template_id) {
+                $this->formCertificateTemplateId = $prog->certificate_template_id;
+            }
+        }
+    }
+
     public function openCreateModal(): void
     {
         $this->reset(['formDonorName', 'formPhone', 'formAmount']);
         $this->formCategory = 'umum';
+        $this->formCertificateTemplateId = null;
         
         $firstProgram = DonationProgram::where('status', 'aktif')->first();
         if ($firstProgram) {
             $this->formProgramId = $firstProgram->id;
+            if ($firstProgram->certificate_template_id) {
+                $this->formCertificateTemplateId = $firstProgram->certificate_template_id;
+            }
         }
 
-        $defaultTpl = CertificateTemplate::where('status', 'aktif')
-            ->where('category', 'umum')
-            ->first();
-        $this->formCertificateTemplateId = $defaultTpl?->id;
+        if (!$this->formCertificateTemplateId) {
+            $defaultTpl = CertificateTemplate::where('status', 'aktif')
+                ->where('category', 'umum')
+                ->first();
+            $this->formCertificateTemplateId = $defaultTpl?->id;
+        }
 
         $this->createModalOpen = true;
     }

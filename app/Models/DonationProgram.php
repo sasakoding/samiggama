@@ -21,6 +21,7 @@ class DonationProgram extends Model
         'pembina',
         'admins',
         'status',
+        'certificate_template_id',
     ];
 
     protected $casts = [
@@ -29,7 +30,13 @@ class DonationProgram extends Model
         'end_date' => 'date',
         'pembina' => 'array',
         'admins' => 'array',
+        'certificate_template_id' => 'integer',
     ];
+
+    public function certificateTemplate()
+    {
+        return $this->belongsTo(CertificateTemplate::class);
+    }
 
     public function donations()
     {

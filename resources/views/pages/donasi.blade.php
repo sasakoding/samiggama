@@ -14,7 +14,7 @@ new class extends Component
         $donationPrograms = DonationProgram::with(['donations' => function($q) {
             $q->where('status', 'verified');
         }])->latest()->get();
-        $donations = Donation::with('donationProgram', 'issuedCertificate.certificateTemplate')->where('status', 'verified')->latest()->get();
+        $donations = Donation::with('donationProgram.certificateTemplate', 'issuedCertificate.certificateTemplate')->where('status', 'verified')->latest()->get();
         
         $activeTemplates = CertificateTemplate::where('status', 'aktif')->orderByDesc('min_amount')->get();
         $defaultTemplate = $activeTemplates->first() ?? CertificateTemplate::first();
@@ -42,6 +42,9 @@ new class extends Component
 
             // Match template
             $matchedTemplate = $d->issuedCertificate?->certificateTemplate;
+            if (!$matchedTemplate && $d->donationProgram?->certificateTemplate) {
+                $matchedTemplate = $d->donationProgram->certificateTemplate;
+            }
             if (!$matchedTemplate) {
                 if ($isAlm) {
                     $matchedTemplate = $activeTemplates->firstWhere('category', 'alm') 

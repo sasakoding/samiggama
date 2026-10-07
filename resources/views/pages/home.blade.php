@@ -61,6 +61,10 @@ new class extends Component
                 $matchedTemplate = $allTemplates->firstWhere('id', $d->issuedCertificate->certificate_template_id);
             }
             
+            if (!$matchedTemplate && $d->donationProgram?->certificate_template_id) {
+                $matchedTemplate = $allTemplates->firstWhere('id', $d->donationProgram->certificate_template_id);
+            }
+
             if (!$matchedTemplate) {
                 if ($isAlm && $pattidanaTemplate) {
                     $matchedTemplate = $pattidanaTemplate;

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\DonationProgram;
+use App\Models\CertificateTemplate;
 use App\Services\ImageUploadService;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -25,6 +26,7 @@ new class extends Component
     public string $formContent = '';
     public array $formPembina = [];
     public string $formStatus = 'aktif';
+    public ?int $formCertificateTemplateId = null;
     public $formCoverImage = null;
     public ?string $existingCoverImage = null;
 
@@ -47,6 +49,7 @@ new class extends Component
         ]);
         $this->formCategory = 'Pembangunan & Sarana';
         $this->formStatus = 'aktif';
+        $this->formCertificateTemplateId = null;
         $this->formStartDate = date('Y-m-d');
         $this->loadDefaultSangha();
         $this->modalOpen = true;
@@ -70,6 +73,7 @@ new class extends Component
             ? $program->pembina
             : $this->getDefaultSanghaArray();
         $this->formStatus = $program->status;
+        $this->formCertificateTemplateId = $program->certificate_template_id;
         $this->existingCoverImage = $program->cover_image;
         $this->formCoverImage = null;
 
@@ -133,6 +137,7 @@ new class extends Component
             'formTitle' => 'required|string|max:255',
             'formCategory' => 'required|string',
             'formTarget' => 'required|numeric|min:1000',
+            'formCertificateTemplateId' => 'nullable|exists:certificate_templates,id',
             'formCoverImage' => 'nullable|image|max:10240', // max 10MB
         ]);
 
@@ -167,6 +172,7 @@ new class extends Component
                     'content' => $this->formContent,
                     'pembina' => !empty($cleanPembina) ? $cleanPembina : null,
                     'status' => $this->formStatus,
+                    'certificate_template_id' => $this->formCertificateTemplateId ?: null,
                     'cover_image' => $coverImagePath,
                 ]);
 
@@ -187,6 +193,7 @@ new class extends Component
                 'content' => $this->formContent,
                 'pembina' => !empty($cleanPembina) ? $cleanPembina : null,
                 'status' => $this->formStatus,
+                'certificate_template_id' => $this->formCertificateTemplateId ?: null,
                 'cover_image' => $coverImagePath ?: 'images/gallery-altar.jpg',
             ]);
 
@@ -245,6 +252,7 @@ new class extends Component
             'countAktif' => $countAktif,
             'countSelesai' => $countSelesai,
             'availableSangha' => \App\Models\SanghaMember::active()->get(),
+            'availableTemplates' => CertificateTemplate::where('status', 'aktif')->orderBy('name')->get(),
         ])->title('Kelola Program Donasi')->layout('layouts::admin');
     }
 };
@@ -373,9 +381,16 @@ new class extends Component
                                         <span class="font-extrabold text-stone-900 dark:text-stone-100 text-xs sm:text-sm truncate">
                                             {{ $prog->title }}
                                         </span>
-                                        <span class="text-[11px] text-stone-400 mt-0.5">
-                                            {{ $prog->category }}
-                                        </span>
+                                        <div class="flex items-center gap-1.5 mt-0.5">
+                                            <span class="text-[11px] text-stone-400">
+                                                {{ $prog->category }}
+                                            </span>
+                                            @if ($prog->certificateTemplate)
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20" title="Template Piagam Khusus">
+                                                    📜 {{ $prog->certificateTemplate->name }}
+                                                </span>
+                                            @endif
+                                        </div>
 
                                         <div class="space-y-1 mt-2.5">
                                             <div class="flex justify-between text-[10.5px] font-bold text-stone-600 dark:text-stone-300">
@@ -569,6 +584,23 @@ new class extends Component
                                 </div>
                             @endif
                         </div>
+                    </div>
+
+                    <!-- Template Piagam Khusus -->
+                    <div class="space-y-1.5">
+                        <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                            Template Piagam Terkait (Opsional)
+                        </label>
+                        <select 
+                            wire:model="formCertificateTemplateId" 
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
+                        >
+                            <option value="">-- Standar (Otomatis Sesuai Default / Kategori Vihara) --</option>
+                            @foreach ($availableTemplates as $tpl)
+                                <option value="{{ $tpl->id }}">{{ $tpl->name }} ({{ $tpl->category_label }})</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[11px] text-stone-400">Jika dikosongkan atau template dihapus, otomatis memakai piagam standar Vihara.</p>
                     </div>
 
                     <!-- Periode Mulai & Selesai -->
