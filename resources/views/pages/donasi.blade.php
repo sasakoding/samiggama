@@ -827,12 +827,12 @@ new class extends Component
 
                                 <!-- 2. Nama Donatur (Positioned directly in the blank space under 'Kepada') -->
                                 <div 
-                                    class="absolute left-1/2 w-[68%] text-center pointer-events-none"
+                                    class="absolute left-1/2 w-[80%] text-center pointer-events-none"
                                     style="top: 38%; transform: translate(-50%, -50%);"
                                 >
                                     <span 
-                                        class="font-serif font-black text-[#0f172a] tracking-wide uppercase drop-shadow-xs block truncate"
-                                        style="font-size: clamp(14px, 2.7vw, 30px); line-height: 1.2;"
+                                        class="font-serif font-bold text-[#0f172a] tracking-wide uppercase drop-shadow-xs block leading-tight break-words"
+                                        :style="selectedCertificate.name && selectedCertificate.name.length > 50 ? 'font-size: clamp(9px, 1.4vw, 15px);' : (selectedCertificate.name && selectedCertificate.name.length > 25 ? 'font-size: clamp(11px, 1.8vw, 19px);' : 'font-size: clamp(12px, 2.2vw, 24px);')"
                                         x-text="selectedCertificate.name"
                                     ></span>
                                 </div>
@@ -1232,12 +1232,19 @@ new class extends Component
                         // 1. Draw the official certificate template background
                         ctx.drawImage(img, 0, 0, 2048, 1468);
 
-                        // 2. Write Nama Donatur (centered under 'Kepada' at Y = 558)
+                        // 2. Write Nama Donatur (centered under 'Kepada' at Y = 558, auto-scaled to prevent truncation)
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.font = 'bold 56px "Plus Jakarta Sans", "Georgia", serif';
+                        const donorName = (cert.name || '').toUpperCase();
+                        let fontSize = 40;
+                        ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", "Georgia", serif`;
+                        const maxTextWidth = 1600;
+                        while (ctx.measureText(donorName).width > maxTextWidth && fontSize > 16) {
+                            fontSize -= 2;
+                            ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", "Georgia", serif`;
+                        }
                         ctx.fillStyle = '#0f172a';
-                        ctx.fillText(cert.name.toUpperCase(), 1024, 558);
+                        ctx.fillText(donorName, 1024, 558, maxTextWidth);
 
                         // 3. Write Nominal Donasi (centered under 'sebesar :' at Y = 866)
                         ctx.font = 'bold 64px "Plus Jakarta Sans", "Arial", sans-serif';
