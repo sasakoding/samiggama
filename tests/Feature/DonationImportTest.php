@@ -116,4 +116,37 @@ CSV;
         ]);
         $this->assertEquals(2, Donation::count());
     }
+
+    public function test_livewire_transaksi_print_modal_contains_required_columns(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = DonationProgram::create([
+            'title' => 'Pembangunan Kuti Bhikkhu',
+            'slug' => 'pembangunan-kuti-bhikkhu',
+            'category' => 'Pembangunan & Sarana',
+            'target_amount' => 10000000,
+            'status' => 'aktif',
+        ]);
+
+        Donation::create([
+            'invoice_number' => 'DN-20261008-0001',
+            'donation_program_id' => $program->id,
+            'donor_name' => 'Donatur Dermawan',
+            'amount' => 750000,
+            'total_amount' => 750000,
+            'status' => 'verified',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test('admin::transaksi')
+            ->call('openPrintModal')
+            ->assertSet('printModalOpen', true)
+            ->assertSee('Cetak Laporan Transaksi Donasi')
+            ->assertSee('Donatur Dermawan')
+            ->assertSee('Pembangunan Kuti Bhikkhu')
+            ->assertSee('Rp 750.000')
+            ->assertSeeHtml('window.print()')
+            ->assertHasNoErrors();
+    }
 }
+

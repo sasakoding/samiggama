@@ -86,8 +86,6 @@ class ImageUploadService
                 @unlink($sourcePath);
             }
 
-            self::cleanLivewireTmp();
-
             return $folder . '/' . $fileName;
         } catch (\Throwable $e) {
             // Fallback: direct copy file
@@ -105,7 +103,6 @@ class ImageUploadService
                 File::put($targetFile, $file->getContent());
             }
 
-            self::cleanLivewireTmp();
             return $folder . '/' . $fileName;
         }
     }
@@ -133,9 +130,6 @@ class ImageUploadService
         } else {
             File::put($targetFile, $file->getContent());
         }
-
-        // Clean up temporary livewire storage
-        self::cleanLivewireTmp();
 
         return $folder . '/' . $fileName;
     }

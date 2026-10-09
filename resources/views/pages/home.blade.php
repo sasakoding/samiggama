@@ -43,7 +43,8 @@ new class extends Component
         // Format Donors List for Alpine JS modal
         $verifiedDonations = Donation::with('donationProgram')
             ->where('status', 'verified')
-            ->latest()
+            ->oldest()
+            ->orderBy('id', 'asc')
             ->get();
 
         // Prepare Certificate Templates from DB

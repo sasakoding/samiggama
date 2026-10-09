@@ -27,11 +27,14 @@ new class extends Component
     public $formCoverImage = null;
     public ?string $existingCoverImage = null;
     public array $formPhotos = [];
+    public ?GalleryAlbum $editingAlbum = null;
 
     public function openCreateModal(): void
     {
+        $this->resetValidation();
         $this->reset([
             'editingId',
+            'editingAlbum',
             'formTitle',
             'formDescription',
             'formCoverImage',
@@ -46,12 +49,14 @@ new class extends Component
 
     public function openEditModal(int $id): void
     {
-        $album = GalleryAlbum::find($id);
+        $this->resetValidation();
+        $album = GalleryAlbum::with('photos')->find($id);
         if (!$album) {
             return;
         }
 
         $this->editingId = $album->id;
+        $this->editingAlbum = $album;
         $this->formTitle = $album->title;
         $this->formCategory = $album->category;
         $this->formEventDate = $album->event_date ? $album->event_date->format('Y-m-d') : '';
@@ -78,20 +83,33 @@ new class extends Component
             'formTitle' => 'required|string|max:255',
             'formCategory' => 'required|string',
             'formCoverImage' => 'nullable|image|max:10240',
-            'formPhotos.*' => 'nullable|image|max:10240',
+            'formPhotos' => 'nullable|array',
+            'formPhotos.*' => 'image|max:10240',
+        ], [
+            'formTitle.required' => 'Nama kegiatan / judul album wajib diisi.',
+            'formCoverImage.image' => 'File foto sampul harus berupa gambar (JPG, PNG, WebP).',
+            'formCoverImage.max' => 'Ukuran foto sampul maksimal 10MB.',
+            'formPhotos.*.image' => 'Semua file foto tambahan harus berupa gambar valid.',
+            'formPhotos.*.max' => 'Ukuran foto tambahan maksimal 10MB per file.',
         ]);
 
         $coverImagePath = $this->existingCoverImage;
         if ($this->formCoverImage) {
-            $coverImagePath = ImageUploadService::uploadAndCompress($this->formCoverImage, 'uploads/gallery');
+            $newCover = ImageUploadService::uploadAndCompress($this->formCoverImage, 'uploads/gallery');
+            if ($newCover) {
+                if ($this->existingCoverImage && $this->existingCoverImage !== $newCover) {
+                    ImageUploadService::deleteOldImage($this->existingCoverImage);
+                }
+                $coverImagePath = $newCover;
+            }
         }
 
-        $slug = Str::slug($this->formTitle);
+        $slug = Str::slug($this->formTitle) ?: 'album-' . time();
 
         if ($this->editingId) {
             $album = GalleryAlbum::find($this->editingId);
             if ($album) {
-                if ($album->slug !== $slug && GalleryAlbum::where('slug', $slug)->exists()) {
+                if (GalleryAlbum::where('slug', $slug)->where('id', '!=', $album->id)->exists()) {
                     $slug .= '-' . time();
                 }
 
@@ -109,11 +127,13 @@ new class extends Component
                 if (!empty($this->formPhotos)) {
                     foreach ($this->formPhotos as $photoFile) {
                         $photoPath = ImageUploadService::uploadAndCompress($photoFile, 'uploads/gallery');
-                        GalleryPhoto::create([
-                            'gallery_album_id' => $album->id,
-                            'file_path' => $photoPath,
-                            'image_path' => $photoPath,
-                        ]);
+                        if ($photoPath) {
+                            GalleryPhoto::create([
+                                'gallery_album_id' => $album->id,
+                                'file_path' => $photoPath,
+                                'image_path' => $photoPath,
+                            ]);
+                        }
                     }
                 }
 
@@ -138,11 +158,13 @@ new class extends Component
             if (!empty($this->formPhotos)) {
                 foreach ($this->formPhotos as $photoFile) {
                     $photoPath = ImageUploadService::uploadAndCompress($photoFile, 'uploads/gallery');
-                    GalleryPhoto::create([
-                        'gallery_album_id' => $album->id,
-                        'file_path' => $photoPath,
-                        'image_path' => $photoPath,
-                    ]);
+                    if ($photoPath) {
+                        GalleryPhoto::create([
+                            'gallery_album_id' => $album->id,
+                            'file_path' => $photoPath,
+                            'image_path' => $photoPath,
+                        ]);
+                    }
                 }
             }
 
@@ -150,6 +172,7 @@ new class extends Component
         }
 
         ImageUploadService::cleanLivewireTmp();
+        $this->reset(['formCoverImage', 'formPhotos', 'editingId', 'editingAlbum', 'existingCoverImage']);
         $this->modalOpen = false;
     }
 
@@ -190,6 +213,9 @@ new class extends Component
             $photo->delete();
             if ($this->selectedAlbum) {
                 $this->selectedAlbum->refresh();
+            }
+            if ($this->editingAlbum) {
+                $this->editingAlbum->refresh();
             }
             $this->feedbackMessage = "Foto berhasil dihapus dari album.";
         }
@@ -400,6 +426,9 @@ new class extends Component
                             placeholder="cth: Pindapata Akbar 12 Bhikkhu Sangha"
                             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10"
                         />
+                        @error('formTitle')
+                            <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -420,6 +449,9 @@ new class extends Component
                                 <option value="Hari Raya">Hari Raya</option>
                                 <option value="Kegiatan Lainnya">Kegiatan Lainnya</option>
                             </select>
+                            @error('formCategory')
+                                <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         <div class="space-y-1.5">
@@ -431,6 +463,9 @@ new class extends Component
                                 type="date" 
                                 class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
                             />
+                            @error('formEventDate')
+                                <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
 
@@ -444,8 +479,12 @@ new class extends Component
                             placeholder="cth: Pelataran Utama Vihara Sāmaggi Gāma"
                             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
                         />
+                        @error('formLocation')
+                            <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                        @enderror
                     </div>
 
+                    <!-- Foto Sampul Utama -->
                     <div class="space-y-1.5">
                         <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
                             Foto Sampul Utama (Kompresi Otomatis)
@@ -456,8 +495,23 @@ new class extends Component
                             accept="image/*"
                             class="w-full text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-stone-100 dark:file:bg-emerald-950 file:text-stone-700 dark:file:text-stone-300 hover:file:bg-stone-200 cursor-pointer"
                         />
+                        @error('formCoverImage')
+                            <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                        @enderror
+
+                        @if ($formCoverImage)
+                            <div class="mt-2 flex items-center gap-3 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30">
+                                <span class="text-xs text-emerald-700 dark:text-emerald-300 font-bold">Foto sampul baru siap diunggah</span>
+                            </div>
+                        @elseif ($existingCoverImage)
+                            <div class="mt-2 flex items-center gap-3 p-2.5 rounded-xl bg-stone-50 dark:bg-emerald-950/20 border border-stone-200 dark:border-emerald-500/20">
+                                <img src="{{ asset($existingCoverImage) }}" class="w-14 h-10 object-cover rounded-lg border border-stone-300 dark:border-emerald-800" />
+                                <span class="text-[11px] text-stone-500 dark:text-stone-400">Sampul saat ini</span>
+                            </div>
+                        @endif
                     </div>
 
+                    <!-- Foto Tambahan -->
                     <div class="space-y-1.5">
                         <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
                             Foto Tambahan (Multi-Upload)
@@ -469,7 +523,47 @@ new class extends Component
                             accept="image/*"
                             class="w-full text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-stone-100 dark:file:bg-emerald-950 file:text-stone-700 dark:file:text-stone-300 hover:file:bg-stone-200 cursor-pointer"
                         />
+                        @error('formPhotos')
+                            <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                        @enderror
+                        @error('formPhotos.*')
+                            <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                        @enderror
+
+                        @if (!empty($formPhotos))
+                            <div class="mt-1.5 p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                                ✓ {{ count($formPhotos) }} foto tambahan baru dipilih siap diunggah & dikompresi.
+                            </div>
+                        @endif
                     </div>
+
+                    <!-- Foto Tersimpan di Album Ini (Edit Mode) -->
+                    @if ($editingId && $editingAlbum && $editingAlbum->photos->isNotEmpty())
+                        <div class="space-y-1.5 pt-2 border-t border-stone-200 dark:border-emerald-950">
+                            <div class="flex items-center justify-between">
+                                <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                                    Foto Arsip Album Ini ({{ $editingAlbum->photos->count() }})
+                                </label>
+                                <span class="text-[10px] text-stone-400">Arahkan kursor & klik sampah untuk hapus</span>
+                            </div>
+                            <div class="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-36 overflow-y-auto p-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-200 dark:border-emerald-950">
+                                @foreach ($editingAlbum->photos as $ep)
+                                    <div class="relative group aspect-square rounded-lg overflow-hidden border border-stone-200 dark:border-emerald-900/60 shadow-2xs">
+                                        <img src="{{ asset($ep->image_path) }}" class="w-full h-full object-cover" />
+                                        <button 
+                                            wire:click="deletePhoto({{ $ep->id }})" 
+                                            wire:confirm="Hapus foto ini dari album?"
+                                            type="button" 
+                                            class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-rose-400 hover:text-rose-300 cursor-pointer"
+                                            title="Hapus foto ini"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     <div class="space-y-1.5">
                         <label class="block font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
@@ -481,6 +575,15 @@ new class extends Component
                             placeholder="Catatan ringkas mengenai dokumentasi foto kegiatan..."
                             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/25 text-stone-900 dark:text-stone-100 text-xs focus:outline-none focus:border-amber-500"
                         ></textarea>
+                        @error('formDescription')
+                            <p class="text-[11px] text-rose-500 font-semibold">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Uploading Progress Indicator -->
+                    <div wire:loading wire:target="formCoverImage, formPhotos" class="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-[11px] font-semibold flex items-center gap-2">
+                        <svg class="animate-spin w-4 h-4 text-amber-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                        <span>Sedang mengunggah foto ke browser cache... mohon tunggu sebentar.</span>
                     </div>
 
                     <div class="pt-4 border-t border-stone-200 dark:border-emerald-950 flex items-center justify-end gap-2.5">
@@ -493,9 +596,17 @@ new class extends Component
                         </button>
                         <button 
                             type="submit" 
-                            class="py-2.5 px-5 rounded-xl bg-[#0D5B3A] hover:bg-[#0F6B44] text-white font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer"
+                            wire:loading.attr="disabled"
+                            wire:target="saveAlbum, formCoverImage, formPhotos"
+                            class="inline-flex items-center gap-2 py-2.5 px-5 rounded-xl bg-[#0D5B3A] hover:bg-[#0F6B44] text-white font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer disabled:opacity-50"
                         >
-                            {{ $editingId ? 'Simpan Perubahan' : 'Simpan Album' }}
+                            <span wire:loading.remove wire:target="saveAlbum, formCoverImage, formPhotos">
+                                {{ $editingId ? 'Simpan Perubahan' : 'Simpan Album' }}
+                            </span>
+                            <span wire:loading wire:target="saveAlbum, formCoverImage, formPhotos" class="inline-flex items-center gap-1.5">
+                                <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                <span>Menyimpan & Kompresi...</span>
+                            </span>
                         </button>
                     </div>
 

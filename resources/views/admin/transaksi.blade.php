@@ -18,6 +18,9 @@ new class extends Component
     public bool $createModalOpen = false;
     public bool $detailModalOpen = false;
     public bool $importModalOpen = false;
+    public bool $printModalOpen = false;
+    public string $printProgramId = '';
+    public string $printStatus = 'verified';
     public $importFile = null;
     public ?array $importSummary = null;
     public ?Donation $selectedDonation = null;
@@ -111,6 +114,13 @@ new class extends Component
     {
         $this->reset(['importFile', 'importSummary']);
         $this->importModalOpen = true;
+    }
+
+    public function openPrintModal(): void
+    {
+        $this->printProgramId = '';
+        $this->printStatus = $this->activeStatusTab === 'semua' ? 'semua' : $this->activeStatusTab;
+        $this->printModalOpen = true;
     }
 
     public function importExcel(DonationImportService $service): void
@@ -281,7 +291,7 @@ new class extends Component
         }
 
         $donations = $query->paginate(15);
-        $programs = DonationProgram::where('status', 'aktif')->orderBy('title')->get();
+        $programs = DonationProgram::orderBy('title')->get();
 
         // Available certificate templates for the selected category in form
         $availableTemplates = CertificateTemplate::where('status', 'aktif')
@@ -293,6 +303,32 @@ new class extends Component
         $totalDonatur = Donation::where('status', 'verified')->count();
         $totalAlm = Donation::where('status', 'verified')->where('donor_message', 'like', '%Pattid%')->count();
 
+        // Print query & data
+        $printDonations = collect();
+        $printTotalNominal = 0;
+        if ($this->printModalOpen) {
+            $printQuery = Donation::with('donationProgram')->latest();
+            if ($this->printStatus !== 'semua') {
+                $printQuery->where('status', $this->printStatus);
+            }
+            if (!empty($this->printProgramId)) {
+                $printQuery->where('donation_program_id', $this->printProgramId);
+            }
+            if (!empty($this->searchQuery)) {
+                $search = '%' . strtolower($this->searchQuery) . '%';
+                $printQuery->where(function ($q) use ($search) {
+                    $q->whereRaw('LOWER(invoice_number) LIKE ?', [$search])
+                      ->orWhereRaw('LOWER(donor_name) LIKE ?', [$search])
+                      ->orWhereRaw('LOWER(phone) LIKE ?', [$search])
+                      ->orWhereHas('donationProgram', function ($sub) use ($search) {
+                          $sub->whereRaw('LOWER(title) LIKE ?', [$search]);
+                      });
+                });
+            }
+            $printDonations = $printQuery->get();
+            $printTotalNominal = $printDonations->sum('amount');
+        }
+
         return $this->view([
             'donations' => $donations,
             'programs' => $programs,
@@ -300,6 +336,8 @@ new class extends Component
             'totalDanaMasuk' => $totalDanaMasuk,
             'totalDonatur' => $totalDonatur,
             'totalAlm' => $totalAlm,
+            'printDonations' => $printDonations,
+            'printTotalNominal' => $printTotalNominal,
         ])->title('Pencatatan Donatur & Transaksi Dāna')->layout('layouts::admin');
     }
 };
@@ -322,8 +360,17 @@ new class extends Component
             </p>
         </div>
 
-        <!-- CTA Input Donatur & Import -->
+        <!-- CTA Input Donatur & Import & Cetak -->
         <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button 
+                wire:click="openPrintModal" 
+                type="button" 
+                class="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-white dark:bg-emerald-950/70 hover:bg-stone-50 dark:hover:bg-emerald-900/80 text-stone-800 dark:text-stone-200 font-bold text-xs shadow-xs border border-stone-200 dark:border-emerald-500/30 transition-all cursor-pointer transform hover:-translate-y-0.5"
+            >
+                <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                <span>Cetak Laporan</span>
+            </button>
+
             <button 
                 wire:click="openImportModal" 
                 type="button" 
@@ -1075,5 +1122,224 @@ new class extends Component
             </div>
         </template>
     @endif
+
+    <!-- =========================================================================
+         MODAL CETAK LAPORAN TRANSAKSI (NO, NAMA DONATUR, NAMA PROGRAM, NOMINAL)
+         ========================================================================= -->
+    @if ($printModalOpen)
+        <template x-teleport="body">
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+                <div 
+                    wire:click="$set('printModalOpen', false)" 
+                    class="fixed inset-0 bg-stone-950/70 backdrop-blur-xs transition-opacity"
+                ></div>
+
+                <div class="relative w-full max-w-4xl rounded-3xl bg-white dark:bg-[#071710] border border-stone-200 dark:border-emerald-500/25 shadow-2xl p-6 sm:p-7 space-y-4 z-10 my-auto text-stone-900 dark:text-stone-100 max-h-[90vh] flex flex-col">
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between pb-3 border-b border-stone-200/80 dark:border-emerald-950 shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base sm:text-lg font-bold">Cetak Laporan Transaksi Donasi</h3>
+                                <p class="text-xs text-stone-500 dark:text-stone-400">Pratinjau data rekapitulasi sebelum dicetak ke printer / PDF.</p>
+                            </div>
+                        </div>
+                        <button 
+                            wire:click="$set('printModalOpen', false)" 
+                            type="button" 
+                            class="p-2 rounded-xl text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-emerald-950/60 cursor-pointer"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Filter Bar -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-stone-50 dark:bg-[#0b1f17] border border-stone-200/80 dark:border-emerald-500/20 shrink-0">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Filter Program</label>
+                            <select 
+                                wire:model.live="printProgramId" 
+                                class="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/30 text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                            >
+                                <option value="">Semua Program Donasi</option>
+                                @foreach ($programs as $prog)
+                                    <option value="{{ $prog->id }}">{{ $prog->title }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-1">Filter Status</label>
+                            <select 
+                                wire:model.live="printStatus" 
+                                class="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#071710] border border-stone-300 dark:border-emerald-500/30 text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                            >
+                                <option value="semua">Semua Status</option>
+                                <option value="verified">Terverifikasi (Verified)</option>
+                                <option value="pending">Menunggu Konfirmasi (Pending)</option>
+                                <option value="rejected">Ditolak (Rejected)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Ringkasan Info -->
+                    <div class="flex items-center justify-between text-xs px-1 text-stone-600 dark:text-stone-300 shrink-0">
+                        <span>Data Terpilih: <strong class="text-stone-900 dark:text-white">{{ $printDonations->count() }}</strong> transaksi</span>
+                        <span>Total Nominal: <strong class="text-emerald-700 dark:text-emerald-400 font-bold">Rp {{ number_format($printTotalNominal, 0, ',', '.') }}</strong></span>
+                    </div>
+
+                    <!-- Live Preview Table (No, Nama Donatur, Nama Program, Nominal) -->
+                    <div class="overflow-y-auto flex-1 min-h-[220px] rounded-2xl border border-stone-200/80 dark:border-emerald-950/80">
+                        <table class="w-full text-left text-xs">
+                            <thead class="sticky top-0 bg-stone-100 dark:bg-[#0b1f17] border-b border-stone-200 dark:border-emerald-950 text-[11px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-2.5 px-3.5 text-center w-12">No</th>
+                                    <th class="py-2.5 px-3.5">Nama Donatur</th>
+                                    <th class="py-2.5 px-3.5">Nama Program</th>
+                                    <th class="py-2.5 px-3.5 text-right">Nominal</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-stone-100 dark:divide-emerald-950/40">
+                                @forelse ($printDonations as $idx => $item)
+                                    <tr class="hover:bg-stone-50/60 dark:hover:bg-white/[0.02]">
+                                        <td class="py-2.5 px-3.5 text-center text-stone-400">{{ $idx + 1 }}</td>
+                                        <td class="py-2.5 px-3.5 font-bold text-stone-900 dark:text-stone-100">{{ $item->donor_name }}</td>
+                                        <td class="py-2.5 px-3.5 text-stone-600 dark:text-stone-300">{{ $item->donationProgram?->title ?? '-' }}</td>
+                                        <td class="py-2.5 px-3.5 text-right font-extrabold text-emerald-800 dark:text-emerald-300">
+                                            Rp {{ number_format($item->amount, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="py-8 text-center text-stone-400 italic">
+                                            Tidak ada data transaksi yang cocok dengan kriteria filter saat ini.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Modal Actions -->
+                    <div class="flex items-center justify-between pt-3 border-t border-stone-200/80 dark:border-emerald-950 shrink-0">
+                        <button 
+                            wire:click="$set('printModalOpen', false)" 
+                            type="button" 
+                            class="px-4 py-2.5 rounded-xl text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white font-bold text-xs cursor-pointer transition-colors"
+                        >
+                            Tutup
+                        </button>
+
+                        <button 
+                            @click="window.print()" 
+                            type="button" 
+                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0D5B3A] hover:bg-[#09472D] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            <span>Cetak Sekarang (Print)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- =========================================================================
+             DOKUMEN CETAK RESMI (HANYA MUNCUL SAAT WINDOW.PRINT)
+             ========================================================================= -->
+        <div id="printable-transaksi" class="hidden">
+            <!-- Kop Surat / Header Laporan -->
+            <div class="text-center pb-4 mb-5 border-b-2 border-stone-900">
+                <h1 class="text-xl font-bold tracking-wider uppercase text-black">VIHĀRA SĀMAGGI GĀMA</h1>
+                <p class="text-xs text-stone-600 mt-0.5">Laporan Rekapitulasi Transaksi Donasi Donatur</p>
+                <div class="text-[11px] text-stone-700 mt-3 flex justify-between items-center border-t border-stone-300 pt-2">
+                    <div><strong>Program:</strong> {{ !empty($printProgramId) ? ($programs->firstWhere('id', $printProgramId)?->title ?? 'Semua Program') : 'Semua Program' }}</div>
+                    <div><strong>Status:</strong> {{ ucfirst($printStatus) }}</div>
+                    <div><strong>Dicetak:</strong> {{ now()->translatedFormat('d F Y, H:i') }} WIB</div>
+                </div>
+            </div>
+
+            <!-- Tabel Data: No, Nama Donatur, Nama Program, Nominal -->
+            <table class="w-full text-left text-xs border-collapse border border-stone-800">
+                <thead>
+                    <tr class="bg-stone-100 border-b border-stone-800">
+                        <th class="py-2 px-3 text-center w-12 font-bold text-black border border-stone-400">No</th>
+                        <th class="py-2 px-3 font-bold text-black border border-stone-400">Nama Donatur</th>
+                        <th class="py-2 px-3 font-bold text-black border border-stone-400">Nama Program</th>
+                        <th class="py-2 px-3 text-right font-bold text-black border border-stone-400">Nominal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($printDonations as $index => $item)
+                        <tr class="border-b border-stone-300">
+                            <td class="py-2 px-3 text-center text-stone-800 border border-stone-300">{{ $index + 1 }}</td>
+                            <td class="py-2 px-3 font-semibold text-black border border-stone-300">{{ $item->donor_name }}</td>
+                            <td class="py-2 px-3 text-stone-700 border border-stone-300">{{ $item->donationProgram?->title ?? 'Umum / Operasional' }}</td>
+                            <td class="py-2 px-3 text-right font-bold text-black border border-stone-300">Rp {{ number_format($item->amount, 0, ',', '.') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="py-6 text-center text-stone-500 italic border border-stone-300">
+                                Tidak ada data donasi yang sesuai dengan filter.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+                @if ($printDonations->isNotEmpty())
+                    <tfoot>
+                        <tr class="bg-stone-100 font-bold border-t-2 border-stone-800">
+                            <td colspan="3" class="py-2.5 px-3 text-right uppercase tracking-wider text-black border border-stone-400">Total Nominal:</td>
+                            <td class="py-2.5 px-3 text-right text-black font-extrabold border border-stone-400">Rp {{ number_format($printTotalNominal, 0, ',', '.') }}</td>
+                        </tr>
+                    </tfoot>
+                @endif
+            </table>
+
+            <!-- Tanda Tangan / Pengesahan -->
+            <div class="mt-10 flex justify-between items-start text-xs text-stone-800 avoid-break">
+                <div>
+                    <p class="text-stone-500 text-[11px]">Catatan:</p>
+                    <p class="italic text-[10px] text-stone-500">Dokumen ini diterbitkan secara otomatis oleh Sistem Informasi Vihāra Sāmaggi Gāma.</p>
+                </div>
+                <div class="text-center min-w-[200px]">
+                    <p>Disahkan oleh,</p>
+                    <p class="font-semibold mt-0.5">Pengurus / Admin Vihāra</p>
+                    <div class="h-16"></div>
+                    <p class="font-bold underline text-black">( ............................................ )</p>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Style Khusus Cetak (Print Media) -->
+    <style>
+        @media print {
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 10mm !important;
+            }
+            body * {
+                visibility: hidden !important;
+            }
+            #printable-transaksi, #printable-transaksi * {
+                visibility: visible !important;
+            }
+            #printable-transaksi {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                display: block !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+            .avoid-break {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+        }
+    </style>
 
 </div>

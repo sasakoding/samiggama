@@ -14,7 +14,11 @@ new class extends Component
         $donationPrograms = DonationProgram::with(['donations' => function($q) {
             $q->where('status', 'verified');
         }])->latest()->get();
-        $donations = Donation::with('donationProgram.certificateTemplate', 'issuedCertificate.certificateTemplate')->where('status', 'verified')->latest()->get();
+        $donations = Donation::with('donationProgram.certificateTemplate', 'issuedCertificate.certificateTemplate')
+            ->where('status', 'verified')
+            ->oldest()
+            ->orderBy('id', 'asc')
+            ->get();
         
         $activeTemplates = CertificateTemplate::where('status', 'aktif')->orderByDesc('min_amount')->get();
         $defaultTemplate = $activeTemplates->first() ?? CertificateTemplate::first();
